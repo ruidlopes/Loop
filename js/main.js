@@ -134,6 +134,9 @@ loop.audio.Looper.prototype.error = function() {
 };
 
 loop.audio.Looper.prototype.process = function(e) {
+  if (!this.isRecording) {
+    return;
+  }
   var data = e.inputBuffer.getChannelData(0);
   var sample = new loop.audio.Sample(data);
   sample.update();
@@ -144,6 +147,7 @@ loop.audio.Looper.prototype.record = function() {
   if (this.isRecording) {
     return;
   }
+  this.samples = [];
   this.isRecording = true;
 };
 
