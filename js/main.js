@@ -27,74 +27,27 @@ lib.functions.TRUE = lib.functions.constant(true);
 lib.functions.FALSE = lib.functions.constant(false);
 
 
-namespace('loop.comm.Worker');
-loop.comm.Worker = function() {
-  this.worker = null;
-};
-
-loop.comm.Worker.prototype.thread = lib.functions.EMPTY;
-loop.comm.Worker.prototype.process = lib.functions.EMPTY;
-
-loop.comm.Worker.prototype.threadImpl = function() {
-  var retFn = 'var __fn = ' + this.thread.toString() + ';\n';
-  var msgFn = 'function(e) { var ret = __fn(e.data); postMessage(ret); };\n';
-  var code = retFn + 'onmessage = ' + msgFn;
-  return code;
-};
-
-loop.comm.Worker.prototype.processImpl = function(e) {
-  this.process(e.data);
-};
-
-loop.comm.Worker.prototype.init = function() {
-  var blob = new Blob([this.threadImpl()]);
-  var blobUrl = URL.createObjectURL(blob);
-
-  this.worker = new Worker(blobUrl);
-  this.worker.onmessage = this.processImpl.bind(this);
-};
-
-loop.comm.Worker.prototype.send = function(data) {
-  if (!this.worker) {
-    this.init();
-  }
-  this.worker.postMessage(data);
-};
-
-
-namespace('loop.audio.StereoReduceWorker');
-loop.audio.StereoReduceWorker = function() {
-  loop.comm.Worker.call(this);
-};
-lib.inherits(loop.audio.StereoReduceWorker, loop.comm.Worker);
-
-loop.audio.StereoReduceWorker.prototype.thread = function(data) {
-  var leftAverage = 0;
-  var rightAverage = 0;
-  for (var i = 0, count = 1; i < data.length; i += 2, ++count) {
-    leftAverage += (data[i] - leftAverage) / count;
-    rightAverage += (data[i + 1] - rightAverage) / count;
-  }
-  return {
-    left: leftAverage,
-    right: rightAverage
-  };
-};
-
-
 namespace('loop.audio.Sample');
 loop.audio.Sample = function(sample) {
   this.sample = sample;
   this.averages = null;
 };
-lib.inherits(loop.audio.Sample, loop.audio.StereoReduceWorker);
 
-loop.audio.Sample.prototype.update = function() {
-  this.send(this.sample);
+loop.audio.Sample.prototype.calcAverages = function() {
+  var leftAverage = 0;
+  var rightAverage = 0;
+  for (var i = 0, count = 1; i < this.sample.length; i += 2, ++count) {
+    leftAverage += (this.sample[i] - leftAverage) / count;
+    rightAverage += (this.sample[i + 1] - rightAverage) / count;
+  }
+  this.averages = {
+    left: leftAverage,
+    right: rightAverage
+  };
 };
 
-loop.audio.Sample.prototype.process = function(data) {
-  this.averages = data;
+loop.audio.Sample.prototype.update = function() {
+  this.calcAverages();
   this.render();
 };
 
@@ -109,9 +62,9 @@ loop.audio.Looper = function() {
   this.isRecording = false;
 
   this.gain = loop.audio.core.context.createGain();
-  this.gain.gain.value = 2.0;
+  this.gain.gain.value = 10.0;
 
-  this.script = loop.audio.core.context.createScriptProcessor(1024);
+  this.script = loop.audio.core.context.createScriptProcessor(1024, 1, 1);
   this.script.onaudioprocess = this.process.bind(this);
 };
 
@@ -126,6 +79,7 @@ loop.audio.Looper.prototype.success = function(stream) {
   var mediaSource = loop.audio.core.context.createMediaStreamSource(stream);
   mediaSource.connect(this.gain);
   this.gain.connect(this.script);
+  this.script.connect(loop.audio.core.context.destination);
   this.gain.connect(loop.audio.core.context.destination);
 };
 
@@ -138,7 +92,8 @@ loop.audio.Looper.prototype.process = function(e) {
     return;
   }
   var data = e.inputBuffer.getChannelData(0);
-  var sample = new loop.audio.Sample(data);
+  var sample = new loop.audio.Sample(data.subarray(0));
+  data = null;
   sample.update();
   this.samples.push(sample);
 };
