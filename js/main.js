@@ -52,7 +52,7 @@ loop.audio.Sample.prototype.update = function() {
 };
 
 loop.audio.Sample.prototype.render = function() {
-  console.log(this.averages);
+  loop.ui.plot(this.averages.left, this.averages.right);
 };
 
 
@@ -135,6 +135,21 @@ loop.ui.init = function() {
 };
 
 loop.ui.render = function() {
+};
+
+loop.ui.plotCounter = 0;
+loop.ui.plot = function(left, right) {
+  var middle = loop.ui.canvas.height / 2;
+  loop.ui.paint.beginPath();
+    loop.ui.paint.moveTo(loop.ui.plotCounter, middle - (Math.abs(left * 20) * middle));
+    loop.ui.paint.lineTo(loop.ui.plotCounter, middle + (Math.abs(right * 20) * middle));
+  loop.ui.paint.closePath();
+
+  loop.ui.paint.lineWidth = 1.0;
+  loop.ui.paint.strokeStyle = '#fff';
+  loop.ui.paint.stroke();
+
+  loop.ui.plotCounter++;
 };
 
 loop.ui.resize = function() {
