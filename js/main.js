@@ -27,37 +27,93 @@ lib.functions.TRUE = lib.functions.constant(true);
 lib.functions.FALSE = lib.functions.constant(false);
 
 
-namespace('loop.audio.Sample');
-loop.audio.Sample = function(sample) {
-  this.sample = sample;
-  this.averages = null;
+namespace('lib.threads.Thread');
+lib.threads.Thread = function() {
+  this.binary = null;
+  this.worker = null;
 };
 
-loop.audio.Sample.prototype.calcAverages = function() {
+// This must be overriden with the core thread code.
+lib.threads.Thread.prototype.run = lib.functions.EMPTY;
+// And (optionally) this to capture a returning value.
+lib.threads.Thread.prototype.result = lib.functions.EMPTY;
+
+lib.threads.Thread.prototype.runInternal = function(e) {
+  var retFn = 'var __fn = ' + this.run.toString() + ';';
+  var msgFn = 'function(e) { var ret = __fn(e.data); postMessage(ret); };';
+  return retFn + 'onmessage = ' + msgFn;
+};
+
+lib.threads.Thread.prototype.resultInternal = function(e) {
+  URL.revokeObjectURL(this.binary);
+  this.result(e.data);
+};
+
+lib.threads.Thread.prototype.init = function() {
+  var compiledCode = new Blob([this.runInternal()]);
+  this.binary = URL.createObjectURL(compiledCode);
+  this.worker = new Worker(this.binary);
+  this.worker.onmessage = this.resultInternal.bind(this);
+};
+
+lib.threads.Thread.prototype.start = function(data) {
+  if (!this.worker) {
+    this.init();
+  }
+  this.worker.postMessage(data);
+};
+
+
+namespace('loop.audio.SampleProcessThread');
+loop.audio.SampleProcessThread = function(externalFunction, externalScope) {
+  lib.threads.Thread.call(this);
+  this.externalResult = externalFunction;
+  this.externalScope = externalScope;
+};
+lib.inherits(loop.audio.SampleProcessThread, lib.threads.Thread);
+
+loop.audio.SampleProcessThread.prototype.run = function(data) {
+  var index = data.index;
+  var sample = data.sample;
   var leftAverage = 0;
   var rightAverage = 0;
-  for (var i = 0, count = 1; i < this.sample.length; i += 2, ++count) {
-    leftAverage += (this.sample[i] - leftAverage) / count;
-    rightAverage += (this.sample[i + 1] - rightAverage) / count;
+
+  for (var i = 0, count = 1, invCount = 1, len = sample.length;
+       i < len;
+       i+= 2, count++, invCount = 1 / count) {
+    leftAverage += (sample[i] - leftAverage) * invCount;
+    rightAverage += (sample[i + 1] - rightAverage) * invCount;
   }
-  this.averages = {
+  return {
+    index: index,
     left: leftAverage,
     right: rightAverage
   };
 };
 
-loop.audio.Sample.prototype.update = function() {
-  this.calcAverages();
-  this.render();
+loop.audio.SampleProcessThread.prototype.result = function(data) {
+  this.externalResult.call(this.externalScope, data.index, data.left, data.right);
 };
 
-loop.audio.Sample.prototype.render = function() {
-  loop.ui.plot(this.averages.left, this.averages.right);
+
+namespace('loop.audio.Sample');
+loop.audio.Sample = function(index, sample) {
+  this.index = index;
+  this.sample = sample;
+  this.leftAverage = 0;
+  this.rightAverage = 0;
+};
+
+loop.audio.Sample.prototype.update = function(index, left, right) {
+  this.index = index;
+  this.leftAverage = left;
+  this.rightAverage = right;
 };
 
 
 namespace('loop.audio.Looper');
 loop.audio.Looper = function() {
+  this.thread = null;
   this.samples = [];
   this.isRecording = false;
 
@@ -65,14 +121,20 @@ loop.audio.Looper = function() {
   this.gain.gain.value = 10.0;
 
   this.script = loop.audio.core.context.createScriptProcessor(1024, 1, 1);
-  this.script.onaudioprocess = this.process.bind(this);
+  this.script.onaudioprocess = this.onAudioProcess.bind(this);
 };
 
 loop.audio.Looper.prototype.init = function() {
+  this.thread = new loop.audio.SampleProcessThread(this.result, this);
+
   loop.audio.core.getUserMedia(
       {video: false, audio: true},
       this.success.bind(this),
       this.error.bind(this));
+};
+
+loop.audio.Looper.prototype.result = function(index, left, right) {
+  this.samples[index].update(index, left, right);
 };
 
 loop.audio.Looper.prototype.success = function(stream) {
@@ -87,15 +149,16 @@ loop.audio.Looper.prototype.error = function() {
   console.log('error');
 };
 
-loop.audio.Looper.prototype.process = function(e) {
+loop.audio.Looper.prototype.onAudioProcess = function(e) {
   if (!this.isRecording) {
     return;
   }
+  var index = this.samples.length;
   var data = e.inputBuffer.getChannelData(0);
-  var sample = new loop.audio.Sample(data.subarray(0));
-  data = null;
-  sample.update();
+  var sample = new loop.audio.Sample(index, data);
+
   this.samples.push(sample);
+  this.thread.start({index: index, sample: data});
 };
 
 loop.audio.Looper.prototype.record = function() {
