@@ -217,6 +217,16 @@ loop.audio.Looper.prototype.stopPlaying = function() {
   this.player.disconnect(loop.audio.core.context.destination);
 };
 
+loop.audio.Looper.prototype.toggleCurrentState = function() {
+  if (this.isRecording) {
+    this.stopRecording();
+  } else if (this.isPlaying) {
+    this.stopPlaying();
+  } else {
+    this.startPlaying();
+  }
+};
+
 loop.audio.Looper.prototype.deselect = function() {
   this.selectionMin = 0;
   this.selectionMax = 0;
@@ -324,6 +334,19 @@ loop.events.onClick = function(e) {
   }
 };
 
+loop.events.onKeyDown = function(e) {
+  switch (e.keyCode) {
+    case 82:  // R
+      loop.audio.core.looper.startRecording();
+      break;
+    case 32:  // Space
+      loop.audio.core.looper.toggleCurrentState();
+      break;
+    default:
+      break;
+  }
+};
+
 
 namespace('loop.ui');
 
@@ -365,11 +388,20 @@ loop.ui.resize = function() {
   loop.ui.height = loop.ui.canvas.height = document.height;
 };
 
+
+namespace('loop.main');
+loop.main = function() {
+  loop.audio.core.looper.init();
+  loop.ui.init();
+};
+
+
 // Global events.
-window.addEventListener('load', loop.ui.init);
+window.addEventListener('load', loop.main);
 window.addEventListener('resize', loop.ui.resize);
 
 window.addEventListener('mousedown', loop.events.onMouseDown);
 window.addEventListener('mousemove', loop.events.onMouseMove);
 window.addEventListener('mouseup', loop.events.onMouseUp);
 window.addEventListener('click', loop.events.onClick);
+window.addEventListener('keydown', loop.events.onKeyDown);
