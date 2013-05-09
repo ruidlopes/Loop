@@ -228,7 +228,15 @@ loop.ui.init = function() {
   })();
 };
 
+loop.ui.clear = function() {
+  loop.ui.paint.save();
+  loop.ui.paint.setTransform(1, 0, 0, 1, 0, 0);
+  loop.ui.paint.clearRect(0, 0, loop.ui.width, loop.ui.height);
+  loop.ui.paint.restore();
+}
+
 loop.ui.render = function() {
+  loop.ui.clear();
   loop.audio.core.looper.render();
 };
 
