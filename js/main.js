@@ -37,6 +37,8 @@ lib.threads.Thread = function() {
 lib.threads.Thread.prototype.run = lib.functions.EMPTY;
 // And (optionally) this to capture a returning value.
 lib.threads.Thread.prototype.result = lib.functions.EMPTY;
+// And (optionally) this to handle errors.
+lib.threads.Thread.prototype.error = lib.functions.EMPTY;
 
 lib.threads.Thread.prototype.runInternal = function(e) {
   var retFn = 'var __fn = ' + this.run.toString() + ';';
@@ -53,7 +55,8 @@ lib.threads.Thread.prototype.init = function() {
   var compiledCode = new Blob([this.runInternal()]);
   this.binary = URL.createObjectURL(compiledCode);
   this.worker = new Worker(this.binary);
-  this.worker.onmessage = this.resultInternal.bind(this);
+  this.worker.addEventListener('message', this.resultInternal.bind(this), false);
+  this.worker.addEventListener('error', this.error.bind(this), false);
 };
 
 lib.threads.Thread.prototype.start = function(data) {
@@ -65,10 +68,9 @@ lib.threads.Thread.prototype.start = function(data) {
 
 
 namespace('loop.audio.SampleProcessThread');
-loop.audio.SampleProcessThread = function(externalFunction, externalScope) {
+loop.audio.SampleProcessThread = function(externalResult) {
   lib.threads.Thread.call(this);
-  this.externalResult = externalFunction;
-  this.externalScope = externalScope;
+  this.externalResult = externalResult;
 };
 lib.inherits(loop.audio.SampleProcessThread, lib.threads.Thread);
 
@@ -92,7 +94,7 @@ loop.audio.SampleProcessThread.prototype.run = function(data) {
 };
 
 loop.audio.SampleProcessThread.prototype.result = function(data) {
-  this.externalResult.call(this.externalScope, data.index, data.left, data.right);
+  this.externalResult(data.index, data.left, data.right);
 };
 
 
@@ -125,7 +127,7 @@ loop.audio.Looper = function() {
 };
 
 loop.audio.Looper.prototype.init = function() {
-  this.thread = new loop.audio.SampleProcessThread(this.result, this);
+  this.thread = new loop.audio.SampleProcessThread(this.result.bind(this));
 
   loop.audio.core.getUserMedia(
       {video: false, audio: true},
@@ -173,6 +175,23 @@ loop.audio.Looper.prototype.play = function() {
   this.isRecording = false;
 };
 
+loop.audio.Looper.prototype.render = function() {
+  for (var i = 0; i < this.samples.length; ++i) {
+    var left = this.samples[i].leftAverage;
+    var right = this.samples[i].rightAverage;
+    var middle = loop.ui.height * 0.5;
+
+    loop.ui.paint.beginPath();
+    loop.ui.paint.moveTo(i, middle - (Math.abs(left * 20) * middle));
+    loop.ui.paint.lineTo(i, middle + (Math.abs(right * 20) * middle));
+    loop.ui.paint.closePath();
+
+    loop.ui.paint.lineWidth = 1.0;
+    loop.ui.paint.strokeStyle = '#fff';
+    loop.ui.paint.stroke();
+  }
+};
+
 
 namespace('loop.audio.core');
 
@@ -190,35 +209,32 @@ namespace('loop.ui');
 
 loop.ui.canvas = null;
 loop.ui.paint = null;
+loop.ui.width = 0;
+loop.ui.height = 0;
+
+loop.ui.requestAnimationFrame = (
+    window.requestAnimationFrame ||
+    window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame).bind(window);
 
 loop.ui.init = function() {
   loop.ui.canvas = document.querySelector('canvas');
   loop.ui.paint = loop.ui.canvas.getContext('2d');
   loop.ui.resize();
+
+  (function __loop() {
+    loop.ui.requestAnimationFrame(__loop);
+    loop.ui.render();
+  })();
 };
 
 loop.ui.render = function() {
-};
-
-loop.ui.plotCounter = 0;
-loop.ui.plot = function(left, right) {
-  var middle = loop.ui.canvas.height / 2;
-  loop.ui.paint.beginPath();
-    loop.ui.paint.moveTo(loop.ui.plotCounter, middle - (Math.abs(left * 20) * middle));
-    loop.ui.paint.lineTo(loop.ui.plotCounter, middle + (Math.abs(right * 20) * middle));
-  loop.ui.paint.closePath();
-
-  loop.ui.paint.lineWidth = 1.0;
-  loop.ui.paint.strokeStyle = '#fff';
-  loop.ui.paint.stroke();
-
-  loop.ui.plotCounter++;
+  loop.audio.core.looper.render();
 };
 
 loop.ui.resize = function() {
-  loop.ui.canvas.width = document.width;
-  loop.ui.canvas.height = document.height;
-  loop.ui.render();
+  loop.ui.width = loop.ui.canvas.width = document.width;
+  loop.ui.height = loop.ui.canvas.height = document.height;
 };
 
 window.addEventListener('load', loop.ui.init);
