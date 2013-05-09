@@ -129,6 +129,9 @@ loop.audio.Looper = function() {
   this.player.onaudioprocess = this.onAudioPlayback.bind(this);
   this.isPlaying = false;
   this.playerPosition = 0;
+
+  this.selectionMin = 0;
+  this.selectionMax = 0;
 };
 
 loop.audio.Looper.prototype.init = function() {
@@ -175,12 +178,22 @@ loop.audio.Looper.prototype.onAudioPlayback = function(e) {
   }
   var data = e.outputBuffer.getChannelData(e);
   data.set(this.samples[this.playerPosition].sample);
-  this.playerPosition = (this.playerPosition + 1) % size;
+  if (this.useSelection) {
+    this.playerPosition++;;
+    if (this.playerPosition > this.selectionMax) {
+      this.playerPosition = this.selectionMin;
+    }
+  } else {
+    this.playerPosition = (this.playerPosition + 1) % size;
+  }
 };
 
 loop.audio.Looper.prototype.startRecording = function() {
   if (this.isRecording) {
     return;
+  }
+  if (this.isPlaying) {
+    this.stopPlaying();
   }
   this.samples = [];
   this.isRecording = true;
@@ -195,13 +208,44 @@ loop.audio.Looper.prototype.stopRecording = function() {
 loop.audio.Looper.prototype.startPlaying = function() {
   this.stopRecording();
   this.isPlaying = true;
-  this.playerPosition = 0;
+  this.playerPosition = this.selectionMin;
   this.player.connect(loop.audio.core.context.destination);
 };
 
 loop.audio.Looper.prototype.stopPlaying = function() {
   this.isPlaying = false;
   this.player.disconnect(loop.audio.core.context.destination);
+};
+
+loop.audio.Looper.prototype.deselect = function() {
+  this.selectionMin = 0;
+  this.selectionMax = 0;
+  this.useSelection = false;
+};
+
+loop.audio.Looper.prototype.selecting = function(min, max) {
+  this.selectionMin = Math.min(min, this.samples.length);
+  this.selectionMax = Math.min(max, this.samples.length);
+};
+
+loop.audio.Looper.prototype.subselect = function(x) {
+  if (x < this.selectionMin) {
+    this.selectionMin = x;
+  } else if (x > this.selectionMax) {
+    this.selectionMax = x;
+  } else {
+    var dxMin = x - this.selectionMin;
+    var dxMax = this.selectionMax - x;
+    if (dxMin < dxMax) {
+      this.selectionMin = x;
+    } else {
+      this.selectionMax = x;
+    }
+  }
+};
+
+loop.audio.Looper.prototype.select = function() {
+  this.useSelection = true;
 };
 
 loop.audio.Looper.prototype.render = function() {
@@ -216,8 +260,11 @@ loop.audio.Looper.prototype.render = function() {
     loop.ui.paint.closePath();
 
     loop.ui.paint.lineWidth = 1.0;
-    if (this.isPlaying && i <= this.playerPosition) {
+    if (this.isPlaying && i >= this.selectionMin && i <= this.playerPosition) {
       loop.ui.paint.strokeStyle = '#c33';
+    } else if (this.selectionMin != this.selectionMax &&
+               i >= this.selectionMin && i <= this.selectionMax) {
+      loop.ui.paint.strokeStyle = '#3c3';
     } else {
       loop.ui.paint.strokeStyle = '#fff';
     }
@@ -236,6 +283,46 @@ loop.audio.core.getUserMedia = (
     navigator.getUserMedia || navigator.webkitGetUserMedia).bind(navigator);
 
 loop.audio.core.looper = new loop.audio.Looper();
+
+
+namespace('loop.events');
+
+loop.events.handling = false;
+loop.events.initX = -1;
+loop.events.endX = -1;
+
+loop.events.onMouseDown = function(e) {
+  loop.events.handling = true;
+  loop.events.initX = e.clientX;
+};
+
+loop.events.onMouseMove = function(e) {
+  if (!loop.events.handling) {
+    return;
+  }
+  loop.events.endX = e.clientX;
+
+  var min = Math.min(loop.events.initX, loop.events.endX);
+  var max = Math.max(loop.events.initX, loop.events.endX);
+  loop.audio.core.looper.selecting(min, max);
+};
+
+loop.events.onMouseUp = function(e) {
+  loop.events.handling = false;
+  if (loop.events.initX == loop.events.endX) {
+    loop.audio.core.looper.deselect();
+  } else {
+    loop.audio.core.looper.select();
+  }
+  loop.events.initX = -1;
+  loop.events.endX = -1;
+};
+
+loop.events.onClick = function(e) {
+  if (e.shiftKey) {
+    loop.audio.core.looper.subselect(e.clientX);
+  }
+};
 
 
 namespace('loop.ui');
@@ -278,5 +365,11 @@ loop.ui.resize = function() {
   loop.ui.height = loop.ui.canvas.height = document.height;
 };
 
+// Global events.
 window.addEventListener('load', loop.ui.init);
 window.addEventListener('resize', loop.ui.resize);
+
+window.addEventListener('mousedown', loop.events.onMouseDown);
+window.addEventListener('mousemove', loop.events.onMouseMove);
+window.addEventListener('mouseup', loop.events.onMouseUp);
+window.addEventListener('click', loop.events.onClick);
