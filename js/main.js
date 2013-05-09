@@ -117,13 +117,18 @@ namespace('loop.audio.Looper');
 loop.audio.Looper = function() {
   this.thread = null;
   this.samples = [];
-  this.isRecording = false;
 
   this.gain = loop.audio.core.context.createGain();
   this.gain.gain.value = 10.0;
 
-  this.script = loop.audio.core.context.createScriptProcessor(1024, 1, 1);
-  this.script.onaudioprocess = this.onAudioProcess.bind(this);
+  this.recorder = loop.audio.core.context.createScriptProcessor(1024, 1, 1);
+  this.recorder.onaudioprocess = this.onAudioRecord.bind(this);
+  this.isRecording = false;
+
+  this.player = loop.audio.core.context.createScriptProcessor(1024, 0, 1);
+  this.player.onaudioprocess = this.onAudioPlayback.bind(this);
+  this.isPlaying = false;
+  this.playerPosition = 0;
 };
 
 loop.audio.Looper.prototype.init = function() {
@@ -142,8 +147,7 @@ loop.audio.Looper.prototype.result = function(index, left, right) {
 loop.audio.Looper.prototype.success = function(stream) {
   var mediaSource = loop.audio.core.context.createMediaStreamSource(stream);
   mediaSource.connect(this.gain);
-  this.gain.connect(this.script);
-  this.script.connect(loop.audio.core.context.destination);
+  this.gain.connect(this.recorder);
   this.gain.connect(loop.audio.core.context.destination);
 };
 
@@ -151,28 +155,53 @@ loop.audio.Looper.prototype.error = function() {
   console.log('error');
 };
 
-loop.audio.Looper.prototype.onAudioProcess = function(e) {
+loop.audio.Looper.prototype.onAudioRecord = function(e) {
   if (!this.isRecording) {
     return;
   }
   var index = this.samples.length;
-  var data = e.inputBuffer.getChannelData(0);
+  // Fast-copy the buffer, as ScriptProcessor reuses its internal buffers on each event.
+  var data = new Float32Array(e.inputBuffer.getChannelData(0));
   var sample = new loop.audio.Sample(index, data);
 
   this.samples.push(sample);
   this.thread.start({index: index, sample: data});
 };
 
-loop.audio.Looper.prototype.record = function() {
+loop.audio.Looper.prototype.onAudioPlayback = function(e) {
+  var size = this.samples.length;
+  if (!this.isPlaying || !size) {
+    return;
+  }
+  var data = e.outputBuffer.getChannelData(e);
+  data.set(this.samples[this.playerPosition].sample);
+  this.playerPosition = (this.playerPosition + 1) % size;
+};
+
+loop.audio.Looper.prototype.startRecording = function() {
   if (this.isRecording) {
     return;
   }
   this.samples = [];
   this.isRecording = true;
+  this.recorder.connect(loop.audio.core.context.destination);
 };
 
-loop.audio.Looper.prototype.play = function() {
+loop.audio.Looper.prototype.stopRecording = function() {
   this.isRecording = false;
+  this.recorder.disconnect(loop.audio.core.context.destination);
+};
+
+loop.audio.Looper.prototype.startPlaying = function() {
+  this.stopRecording();
+  this.isPlaying = true;
+  this.playerPosition = 0;
+  this.player.connect(loop.audio.core.context.destination);
+};
+
+loop.audio.Looper.prototype.stopPlaying = function() {
+  this.isPlaying = false;
+  this.player.disconnect(loop.audio.core.context.destination);
 };
 
 loop.audio.Looper.prototype.render = function() {
@@ -187,7 +216,11 @@ loop.audio.Looper.prototype.render = function() {
     loop.ui.paint.closePath();
 
     loop.ui.paint.lineWidth = 1.0;
-    loop.ui.paint.strokeStyle = '#fff';
+    if (this.isPlaying && i <= this.playerPosition) {
+      loop.ui.paint.strokeStyle = '#c33';
+    } else {
+      loop.ui.paint.strokeStyle = '#fff';
+    }
     loop.ui.paint.stroke();
   }
 };
