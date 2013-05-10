@@ -195,6 +195,7 @@ loop.audio.Looper.prototype.startRecording = function() {
   if (this.isPlaying) {
     this.stopPlaying();
   }
+  this.deselect();
   this.samples = [];
   this.isRecording = true;
   this.recorder.connect(loop.audio.core.context.destination);
