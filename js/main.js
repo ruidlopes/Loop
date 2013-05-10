@@ -345,6 +345,11 @@ loop.audio.Looper.prototype.select = function() {
 };
 
 loop.audio.Looper.prototype.render = function() {
+  var rect = this.clientRect();
+  lib.ui.ctx.lineWidth = 1.0;
+  lib.ui.ctx.strokeStyle = '#69c';
+  lib.ui.ctx.strokeRect(0, 0, rect.width, rect.height);
+
   for (var i = 0; i < this.samples.length; ++i) {
     var left = this.samples[i].leftAverage;
     var right = this.samples[i].rightAverage;
@@ -355,7 +360,6 @@ loop.audio.Looper.prototype.render = function() {
     lib.ui.ctx.lineTo(i, middle + (Math.abs(right * 20) * middle));
     lib.ui.ctx.closePath();
 
-    lib.ui.ctx.lineWidth = 1.0;
     if (this.isPlaying && i >= this.selectionMin && i <= this.playerPosition) {
       lib.ui.ctx.strokeStyle = '#c33';
     } else if (this.selectionMin != this.selectionMax &&
