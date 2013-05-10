@@ -15,3 +15,16 @@ canvas {
   height: 100%;
   background-color: #333;
 }
+
+.component {
+  visibility: hidden;
+  z-index: -1000;
+  position: absolute;
+}
+
+#looper {
+  top: 50px;
+  left: 50px;
+  right: 50px;
+  bottom: 50px;
+}

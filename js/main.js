@@ -67,6 +67,84 @@ lib.threads.Thread.prototype.start = function(data) {
 };
 
 
+namespace('lib.ui');
+lib.ui.renderer = null;
+lib.ui.canvas = null;
+lib.ui.ctx = null;
+lib.ui.width = 0;
+lib.ui.height = 0;
+
+lib.ui.requestAnimationFrame = (
+    window.requestAnimationFrame ||
+    window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame).bind(window);
+
+lib.ui.init = function() {
+  lib.ui.canvas = document.querySelector('canvas');
+  lib.ui.ctx = lib.ui.canvas.getContext('2d');
+
+  lib.ui.renderer = new lib.ui.Renderer();
+  lib.ui.resize();
+
+  (function __loop() {
+    lib.ui.requestAnimationFrame(__loop);
+    lib.ui.renderer.render();
+  })();
+};
+
+lib.ui.resize = function() {
+  lib.ui.width = lib.ui.canvas.width = document.width;
+  lib.ui.height = lib.ui.canvas.height = document.height;
+};
+
+
+namespace('lib.ui.Component');
+lib.ui.Component = function(id) {
+  this.id = id;
+  this.element = null;
+
+  this.create();
+};
+
+lib.ui.Component.prototype.create = function() {
+  this.element = document.createElement('div');
+  this.element.id = this.id;
+  this.element.classList.add('component');
+  document.body.appendChild(this.element);
+};
+
+lib.ui.Component.prototype.clientRect = function() {
+  return this.element.getBoundingClientRect();
+};
+
+lib.ui.Component.prototype.render = lib.functions.EMPTY;
+
+
+namespace('lib.ui.Renderer');
+lib.ui.Renderer = function() {
+  this.components = [];
+};
+
+lib.ui.Renderer.prototype.clear = function() {
+  lib.ui.ctx.save();
+  lib.ui.ctx.setTransform(1, 0, 0, 1, 0, 0);
+  lib.ui.ctx.clearRect(0, 0, lib.ui.width, lib.ui.height);
+  lib.ui.ctx.restore();
+};
+
+lib.ui.Renderer.prototype.render = function() {
+  this.clear();
+
+  for (var i = 0, component; component = this.components[i++];) {
+    var rect = component.clientRect();
+    lib.ui.ctx.save();
+    lib.ui.ctx.translate(rect.left, rect.top);
+    component.render();
+    lib.ui.ctx.restore();
+  }
+};
+
+
 namespace('loop.audio.SampleProcessThread');
 loop.audio.SampleProcessThread = function(externalResult) {
   lib.threads.Thread.call(this);
@@ -115,6 +193,8 @@ loop.audio.Sample.prototype.update = function(index, left, right) {
 
 namespace('loop.audio.Looper');
 loop.audio.Looper = function() {
+  lib.ui.Component.call(this, 'looper');
+
   this.thread = null;
   this.samples = [];
 
@@ -133,6 +213,7 @@ loop.audio.Looper = function() {
   this.selectionMin = 0;
   this.selectionMax = 0;
 };
+lib.inherits(loop.audio.Looper, lib.ui.Component);
 
 loop.audio.Looper.prototype.init = function() {
   this.thread = new loop.audio.SampleProcessThread(this.result.bind(this));
@@ -267,23 +348,23 @@ loop.audio.Looper.prototype.render = function() {
   for (var i = 0; i < this.samples.length; ++i) {
     var left = this.samples[i].leftAverage;
     var right = this.samples[i].rightAverage;
-    var middle = loop.ui.height * 0.5;
+    var middle = lib.ui.height * 0.5;
 
-    loop.ui.paint.beginPath();
-    loop.ui.paint.moveTo(i, middle - (Math.abs(left * 20) * middle));
-    loop.ui.paint.lineTo(i, middle + (Math.abs(right * 20) * middle));
-    loop.ui.paint.closePath();
+    lib.ui.ctx.beginPath();
+    lib.ui.ctx.moveTo(i, middle - (Math.abs(left * 20) * middle));
+    lib.ui.ctx.lineTo(i, middle + (Math.abs(right * 20) * middle));
+    lib.ui.ctx.closePath();
 
-    loop.ui.paint.lineWidth = 1.0;
+    lib.ui.ctx.lineWidth = 1.0;
     if (this.isPlaying && i >= this.selectionMin && i <= this.playerPosition) {
-      loop.ui.paint.strokeStyle = '#c33';
+      lib.ui.ctx.strokeStyle = '#c33';
     } else if (this.selectionMin != this.selectionMax &&
-               i >= this.selectionMin && i <= this.selectionMax) {
-      loop.ui.paint.strokeStyle = '#3c3';
+        i >= this.selectionMin && i <= this.selectionMax) {
+      lib.ui.ctx.strokeStyle = '#3c3';
     } else {
-      loop.ui.paint.strokeStyle = '#fff';
+      lib.ui.ctx.strokeStyle = '#fff';
     }
-    loop.ui.paint.stroke();
+    lib.ui.ctx.stroke();
   }
 };
 
@@ -353,57 +434,17 @@ loop.events.onKeyDown = function(e) {
 };
 
 
-namespace('loop.ui');
-
-loop.ui.canvas = null;
-loop.ui.paint = null;
-loop.ui.width = 0;
-loop.ui.height = 0;
-
-loop.ui.requestAnimationFrame = (
-    window.requestAnimationFrame ||
-    window.webkitRequestAnimationFrame ||
-    window.mozRequestAnimationFrame).bind(window);
-
-loop.ui.init = function() {
-  loop.ui.canvas = document.querySelector('canvas');
-  loop.ui.paint = loop.ui.canvas.getContext('2d');
-  loop.ui.resize();
-
-  (function __loop() {
-    loop.ui.requestAnimationFrame(__loop);
-    loop.ui.render();
-  })();
-};
-
-loop.ui.clear = function() {
-  loop.ui.paint.save();
-  loop.ui.paint.setTransform(1, 0, 0, 1, 0, 0);
-  loop.ui.paint.clearRect(0, 0, loop.ui.width, loop.ui.height);
-  loop.ui.paint.restore();
-}
-
-loop.ui.render = function() {
-  loop.ui.clear();
-  loop.audio.core.looper.render();
-};
-
-loop.ui.resize = function() {
-  loop.ui.width = loop.ui.canvas.width = document.width;
-  loop.ui.height = loop.ui.canvas.height = document.height;
-};
-
-
 namespace('loop.main');
 loop.main = function() {
   loop.audio.core.looper.init();
-  loop.ui.init();
+  lib.ui.init();
+  lib.ui.renderer.components.push(loop.audio.core.looper);
 };
 
 
 // Global events.
 window.addEventListener('load', loop.main);
-window.addEventListener('resize', loop.ui.resize);
+window.addEventListener('resize', lib.ui.resize);
 
 window.addEventListener('mousedown', loop.events.onMouseDown);
 window.addEventListener('mousemove', loop.events.onMouseMove);
