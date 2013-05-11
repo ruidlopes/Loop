@@ -433,10 +433,11 @@ loop.audio.Looper.prototype.render = function() {
   lib.ui.ctx.fillStyle = '#9cf';
   lib.ui.ctx.fillRect(1, 1, this.rect.width - 2, this.rect.height - 2);
 
+  var middle = this.rect.height * 0.5;
+
   for (var i = 0; i < this.samples.length; ++i) {
     var left = this.samples[i].leftAverage;
     var right = this.samples[i].rightAverage;
-    var middle = this.rect.height * 0.5;
 
     lib.ui.ctx.beginPath();
     lib.ui.ctx.moveTo(i, middle - (Math.abs(left * 20) * middle));
@@ -444,10 +445,10 @@ loop.audio.Looper.prototype.render = function() {
     lib.ui.ctx.closePath();
 
     if (this.isPlaying && i >= this.selectionMin && i <= this.playerPosition) {
-      lib.ui.ctx.strokeStyle = '#c33';
+      lib.ui.ctx.strokeStyle = '#c00';
     } else if (this.selectionMin != this.selectionMax &&
         i >= this.selectionMin && i <= this.selectionMax) {
-      lib.ui.ctx.strokeStyle = '#3c3';
+      lib.ui.ctx.strokeStyle = '#369';
     } else {
       lib.ui.ctx.strokeStyle = '#69c';
     }
