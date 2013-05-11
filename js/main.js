@@ -95,6 +95,7 @@ lib.ui.init = function() {
 lib.ui.resize = function() {
   lib.ui.width = lib.ui.canvas.width = document.width;
   lib.ui.height = lib.ui.canvas.height = document.height;
+  lib.ui.maestro.resize();
 };
 
 
@@ -102,6 +103,7 @@ namespace('lib.ui.Component');
 lib.ui.Component = function(id) {
   this.id = id;
   this.element = null;
+  this.rect = null;
 
   this.create();
 };
@@ -113,16 +115,15 @@ lib.ui.Component.prototype.create = function() {
   document.body.appendChild(this.element);
 };
 
-lib.ui.Component.prototype.clientRect = function() {
-  return this.element.getBoundingClientRect();
+lib.ui.Component.prototype.computeRect = function() {
+  this.rect = this.element.getBoundingClientRect();
 };
 
 lib.ui.Component.prototype.isCoordinateWithin = function(x, y) {
-  var rect = this.clientRect();
-  return x >= rect.left &&
-    x <= rect.right &&
-    y >= rect.top &&
-    y <= rect.bottom;
+  return x >= this.rect.left &&
+    x <= this.rect.right &&
+    y >= this.rect.top &&
+    y <= this.rect.bottom;
 };
 
 lib.ui.Component.prototype.render = lib.functions.EMPTY;
@@ -145,24 +146,29 @@ lib.ui.Maestro.prototype.clear = function() {
   lib.ui.ctx.restore();
 };
 
+lib.ui.Maestro.prototype.resize = function() {
+  for (var i = 0, component; component = this.components[i++];) {
+    component.computeRect();
+  }
+};
+
 lib.ui.Maestro.prototype.render = function() {
   this.clear();
 
   for (var i = 0, component; component = this.components[i++];) {
-    var rect = component.clientRect();
     lib.ui.ctx.save();
-    lib.ui.ctx.translate(rect.left + 0.5, rect.top + 0.5);
+    lib.ui.ctx.translate(component.rect.left + 0.5, component.rect.top + 0.5);
     component.render();
     lib.ui.ctx.restore();
   }
 };
 
 lib.ui.Maestro.prototype.tX = function(component, x) {
-  return x - component.clientRect().left;
+  return x - component.rect.left;
 };
 
 lib.ui.Maestro.prototype.tY = function(component, y) {
-  return y - component.clientRect().top;
+  return y - component.rect.top;
 };
 
 lib.ui.Maestro.prototype.willHandleMouse = function(e, component, handler) {
@@ -420,15 +426,17 @@ loop.audio.Looper.prototype.select = function() {
 };
 
 loop.audio.Looper.prototype.render = function() {
-  var rect = this.clientRect();
   lib.ui.ctx.lineWidth = 1.0;
   lib.ui.ctx.strokeStyle = '#69c';
-  lib.ui.ctx.strokeRect(0, 0, rect.width, rect.height);
+  lib.ui.ctx.strokeRect(0, 0, this.rect.width, this.rect.height);
+
+  lib.ui.ctx.fillStyle = '#9cf';
+  lib.ui.ctx.fillRect(1, 1, this.rect.width - 2, this.rect.height - 2);
 
   for (var i = 0; i < this.samples.length; ++i) {
     var left = this.samples[i].leftAverage;
     var right = this.samples[i].rightAverage;
-    var middle = lib.ui.height * 0.5;
+    var middle = this.rect.height * 0.5;
 
     lib.ui.ctx.beginPath();
     lib.ui.ctx.moveTo(i, middle - (Math.abs(left * 20) * middle));
@@ -441,7 +449,7 @@ loop.audio.Looper.prototype.render = function() {
         i >= this.selectionMin && i <= this.selectionMax) {
       lib.ui.ctx.strokeStyle = '#3c3';
     } else {
-      lib.ui.ctx.strokeStyle = '#fff';
+      lib.ui.ctx.strokeStyle = '#69c';
     }
     lib.ui.ctx.stroke();
   }
