@@ -138,7 +138,7 @@ lib.ui.Renderer.prototype.render = function() {
   for (var i = 0, component; component = this.components[i++];) {
     var rect = component.clientRect();
     lib.ui.ctx.save();
-    lib.ui.ctx.translate(rect.left, rect.top);
+    lib.ui.ctx.translate(rect.left + 0.5, rect.top + 0.5);
     component.render();
     lib.ui.ctx.restore();
   }
