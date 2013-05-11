@@ -390,6 +390,14 @@ loop.audio.Looper.prototype.stopPlaying = function() {
   this.player.disconnect(loop.audio.core.context.destination);
 };
 
+loop.audio.Looper.prototype.stopAnything = function() {
+  if (this.isPlaying) {
+    this.stopPlaying();
+  } else if (this.isRecording) {
+    this.stopRecording();
+  }
+};
+
 loop.audio.Looper.prototype.toggleCurrentState = function() {
   if (this.isRecording) {
     this.stopRecording();
@@ -500,12 +508,19 @@ loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
 };
 
 loop.audio.Looper.prototype.handleKeyDown = function(e) {
-  if (e.keyCode == 82) {  // R
-    this.startRecording();
-  } else if (e.keyCode == 32) {  // Space
-    this.toggleCurrentState();
-  } else {
-    return false;
+  switch (e.keyCode) {
+    case 82: // R
+      this.startRecording();
+      break;
+    case 32: // Space
+      this.toggleCurrentState();
+      break;
+    case 27: // Esc
+      this.stopAnything();
+      break;
+    default:
+      return false;
+      break;
   }
   return true;
 };
