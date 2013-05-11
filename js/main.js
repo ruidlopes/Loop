@@ -131,6 +131,7 @@ lib.ui.Component.prototype.handleMouseDown = lib.functions.FALSE;
 lib.ui.Component.prototype.handleMouseMove = lib.functions.FALSE;
 lib.ui.Component.prototype.handleMouseUp = lib.functions.FALSE;
 lib.ui.Component.prototype.handleClick = lib.functions.FALSE;
+lib.ui.Component.prototype.handleWheel = lib.functions.FALSE;
 lib.ui.Component.prototype.handleKeyDown = lib.functions.FALSE;
 
 
@@ -173,6 +174,22 @@ lib.ui.Maestro.prototype.render = function() {
   }
 };
 
+lib.ui.Maestro.prototype.addEventListener = function(eventType, handler) {
+  window.addEventListener(eventType, handler.bind(this));
+};
+
+lib.ui.Maestro.prototype.addEventListeners = function() {
+  this.addEventListener('mousedown', this.handleMouseDown);
+  this.addEventListener('mousemove', this.handleMouseMove);
+  this.addEventListener('mouseup', this.handleMouseUp);
+  this.addEventListener('click', this.handleClick);
+
+  this.addEventListener('mousewheel', this.handleWheel);
+  this.addEventListener('wheel', this.handleWheel);
+
+  this.addEventListener('keydown', this.handleKeyDown);
+};
+
 lib.ui.Maestro.prototype.tX = function(component, x) {
   return x - component.rect.left;
 };
@@ -181,54 +198,62 @@ lib.ui.Maestro.prototype.tY = function(component, y) {
   return y - component.rect.top;
 };
 
-lib.ui.Maestro.prototype.willHandleMouse = function(e, component, handler) {
+lib.ui.Maestro.prototype.willHandleMouse = function(e, component, handler, param1, param2) {
   return component.isCoordinateWithin(e.clientX, e.clientY) &&
-    handler.call(component, e, this.tX(component, e.clientX), this.tY(component, e.clientY));
+    handler.call(component, e,
+        this.tX(component, e.clientX), this.tY(component, e.clientY),
+        param1, param2);
 };
 
 lib.ui.Maestro.prototype.handleMouseDown = function(e) {
   for (var i = 0, component; component = this.components[i++];) {
     if (this.willHandleMouse(e, component, component.handleMouseDown)) {
-      return false;
+      return;
     }
   }
-  return true;
 };
 
 lib.ui.Maestro.prototype.handleMouseMove = function(e) {
   for (var i = 0, component; component = this.components[i++];) {
     if (this.willHandleMouse(e, component, component.handleMouseMove)) {
-      return false;
+      return;
     }
   }
-  return true;
 };
 
 lib.ui.Maestro.prototype.handleMouseUp = function(e) {
   for (var i = 0, component; component = this.components[i++];) {
     if (this.willHandleMouse(e, component, component.handleMouseUp)) {
-      return false;
+      return;
     }
   }
-  return true;
 };
 
 lib.ui.Maestro.prototype.handleClick = function(e) {
   for (var i = 0, component; component = this.components[i++];) {
     if (this.willHandleMouse(e, component, component.handleClick)) {
-      return false;
+      return;
     }
   }
-  return true;
+};
+
+lib.ui.Maestro.prototype.handleWheel = function(e) {
+  var deltaX = e.deltaX || e.wheelDeltaX;
+  var deltaY = e.deltaY || e.wheelDeltaY;
+  for (var i = 0, component; component = this.components[i++];) {
+    if (this.willHandleMouse(e, component, component.handleWheel, deltaX, deltaY)) {
+      return;
+    }
+  }
+  e.preventDefault();
 };
 
 lib.ui.Maestro.prototype.handleKeyDown = function(e) {
   for (var i = 0, component; component = this.components[i++];) {
     if (component.handleKeyDown(e)) {
-      return false;
+      return;
     }
   }
-  return true;
 };
 
 
@@ -507,6 +532,12 @@ loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
   }
 };
 
+loop.audio.Looper.prototype.handleWheel = function(e, tx, ty, wheelX, wheelY) {
+  if (!wheelX) {
+    return;
+  }
+};
+
 loop.audio.Looper.prototype.handleKeyDown = function(e) {
   switch (e.keyCode) {
     case 82: // R
@@ -519,10 +550,8 @@ loop.audio.Looper.prototype.handleKeyDown = function(e) {
       this.stopAnything();
       break;
     default:
-      return false;
       break;
   }
-  return true;
 };
 
 
@@ -541,13 +570,7 @@ loop.main = function() {
 
   // Global events.
   window.addEventListener('resize', lib.ui.resize);
-
-  // Mouse and key events.
-  window.addEventListener('mousedown', lib.ui.maestro.handleMouseDown.bind(lib.ui.maestro));
-  window.addEventListener('mousemove', lib.ui.maestro.handleMouseMove.bind(lib.ui.maestro));
-  window.addEventListener('mouseup', lib.ui.maestro.handleMouseUp.bind(lib.ui.maestro));
-  window.addEventListener('click', lib.ui.maestro.handleClick.bind(lib.ui.maestro));
-  window.addEventListener('keydown', lib.ui.maestro.handleKeyDown.bind(lib.ui.maestro));
+  lib.ui.maestro.addEventListeners();
 };
 
 // Start the show.
