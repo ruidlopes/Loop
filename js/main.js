@@ -288,11 +288,11 @@ loop.audio.Looper = function() {
   this.gain = loop.audio.core.context.createGain();
   this.gain.gain.value = 10.0;
 
-  this.recorder = loop.audio.core.context.createScriptProcessor(1024, 1, 1);
+  this.recorder = loop.audio.core.context.createScriptProcessor(512, 1, 1);
   this.recorder.onaudioprocess = this.onAudioRecord.bind(this);
   this.isRecording = false;
 
-  this.player = loop.audio.core.context.createScriptProcessor(1024, 0, 1);
+  this.player = loop.audio.core.context.createScriptProcessor(512, 0, 1);
   this.player.onaudioprocess = this.onAudioPlayback.bind(this);
   this.isPlaying = false;
   this.playerPosition = 0;
