@@ -156,6 +156,11 @@ lib.ui.Maestro.prototype.render = function() {
   this.clear();
 
   for (var i = 0, component; component = this.components[i++];) {
+    lib.ui.ctx.beginPath();
+    lib.ui.ctx.rect(
+        component.rect.left, component.rect.top, component.rect.width, component.rect.height);
+    lib.ui.ctx.clip();
+
     lib.ui.ctx.save();
     lib.ui.ctx.translate(component.rect.left + 0.5, component.rect.top + 0.5);
     component.render();
