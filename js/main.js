@@ -83,7 +83,6 @@ lib.ui.init = function() {
   lib.ui.canvas = document.querySelector('canvas');
   lib.ui.ctx = lib.ui.canvas.getContext('2d');
 
-  lib.ui.maestro = new lib.ui.Maestro();
   lib.ui.resize();
 
   (function __loop() {
@@ -126,6 +125,7 @@ lib.ui.Component.prototype.isCoordinateWithin = function(x, y) {
     y <= this.rect.bottom;
 };
 
+lib.ui.Component.prototype.init = lib.functions.EMPTY;
 lib.ui.Component.prototype.render = lib.functions.EMPTY;
 lib.ui.Component.prototype.handleMouseDown = lib.functions.FALSE;
 lib.ui.Component.prototype.handleMouseMove = lib.functions.FALSE;
@@ -137,6 +137,11 @@ lib.ui.Component.prototype.handleKeyDown = lib.functions.FALSE;
 namespace('lib.ui.Maestro');
 lib.ui.Maestro = function() {
   this.components = [];
+};
+
+lib.ui.Maestro.prototype.addComponent = function(component) {
+  this.components.push(component);
+  component.init();
 };
 
 lib.ui.Maestro.prototype.clear = function() {
@@ -497,9 +502,9 @@ loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
 
 loop.audio.Looper.prototype.handleKeyDown = function(e) {
   if (e.keyCode == 82) {  // R
-    loop.audio.core.looper.startRecording();
+    this.startRecording();
   } else if (e.keyCode == 32) {  // Space
-    loop.audio.core.looper.toggleCurrentState();
+    this.toggleCurrentState();
   } else {
     return false;
   }
@@ -516,14 +521,12 @@ loop.audio.core.context = (function() {
 loop.audio.core.getUserMedia = (
     navigator.getUserMedia || navigator.webkitGetUserMedia).bind(navigator);
 
-loop.audio.core.looper = new loop.audio.Looper();
-
 
 namespace('loop.main');
 loop.main = function() {
-  loop.audio.core.looper.init();
+  lib.ui.maestro = new lib.ui.Maestro();
+  lib.ui.maestro.addComponent(new loop.audio.Looper());
   lib.ui.init();
-  lib.ui.maestro.components.push(loop.audio.core.looper);
 
   // Global events.
   window.addEventListener('resize', lib.ui.resize);
