@@ -5,6 +5,10 @@ body {
   color: #ddd;
   font-size: 12pt;
   font-family: "Helvetica", "Arial", sans-serif;
+
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
 }
 
 canvas {
