@@ -68,7 +68,7 @@ lib.threads.Thread.prototype.start = function(data) {
 
 
 namespace('lib.ui');
-lib.ui.renderer = null;
+lib.ui.maestro = null;
 lib.ui.canvas = null;
 lib.ui.ctx = null;
 lib.ui.width = 0;
@@ -83,12 +83,12 @@ lib.ui.init = function() {
   lib.ui.canvas = document.querySelector('canvas');
   lib.ui.ctx = lib.ui.canvas.getContext('2d');
 
-  lib.ui.renderer = new lib.ui.Renderer();
+  lib.ui.maestro = new lib.ui.Maestro();
   lib.ui.resize();
 
   (function __loop() {
     lib.ui.requestAnimationFrame(__loop);
-    lib.ui.renderer.render();
+    lib.ui.maestro.render();
   })();
 };
 
@@ -117,22 +117,35 @@ lib.ui.Component.prototype.clientRect = function() {
   return this.element.getBoundingClientRect();
 };
 
+lib.ui.Component.prototype.isCoordinateWithin = function(x, y) {
+  var rect = this.clientRect();
+  return x >= rect.left &&
+    x <= rect.right &&
+    y >= rect.top &&
+    y <= rect.bottom;
+};
+
 lib.ui.Component.prototype.render = lib.functions.EMPTY;
+lib.ui.Component.prototype.handleMouseDown = lib.functions.FALSE;
+lib.ui.Component.prototype.handleMouseMove = lib.functions.FALSE;
+lib.ui.Component.prototype.handleMouseUp = lib.functions.FALSE;
+lib.ui.Component.prototype.handleClick = lib.functions.FALSE;
+lib.ui.Component.prototype.handleKeyDown = lib.functions.FALSE;
 
 
-namespace('lib.ui.Renderer');
-lib.ui.Renderer = function() {
+namespace('lib.ui.Maestro');
+lib.ui.Maestro = function() {
   this.components = [];
 };
 
-lib.ui.Renderer.prototype.clear = function() {
+lib.ui.Maestro.prototype.clear = function() {
   lib.ui.ctx.save();
   lib.ui.ctx.setTransform(1, 0, 0, 1, 0, 0);
   lib.ui.ctx.clearRect(0, 0, lib.ui.width, lib.ui.height);
   lib.ui.ctx.restore();
 };
 
-lib.ui.Renderer.prototype.render = function() {
+lib.ui.Maestro.prototype.render = function() {
   this.clear();
 
   for (var i = 0, component; component = this.components[i++];) {
@@ -142,6 +155,64 @@ lib.ui.Renderer.prototype.render = function() {
     component.render();
     lib.ui.ctx.restore();
   }
+};
+
+lib.ui.Maestro.prototype.tX = function(component, x) {
+  return x - component.clientRect().left;
+};
+
+lib.ui.Maestro.prototype.tY = function(component, y) {
+  return y - component.clientRect().top;
+};
+
+lib.ui.Maestro.prototype.willHandleMouse = function(e, component, handler) {
+  return component.isCoordinateWithin(e.clientX, e.clientY) &&
+    handler.call(component, e, this.tX(component, e.clientX), this.tY(component, e.clientY));
+};
+
+lib.ui.Maestro.prototype.handleMouseDown = function(e) {
+  for (var i = 0, component; component = this.components[i++];) {
+    if (this.willHandleMouse(e, component, component.handleMouseDown)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+lib.ui.Maestro.prototype.handleMouseMove = function(e) {
+  for (var i = 0, component; component = this.components[i++];) {
+    if (this.willHandleMouse(e, component, component.handleMouseMove)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+lib.ui.Maestro.prototype.handleMouseUp = function(e) {
+  for (var i = 0, component; component = this.components[i++];) {
+    if (this.willHandleMouse(e, component, component.handleMouseUp)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+lib.ui.Maestro.prototype.handleClick = function(e) {
+  for (var i = 0, component; component = this.components[i++];) {
+    if (this.willHandleMouse(e, component, component.handleClick)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+lib.ui.Maestro.prototype.handleKeyDown = function(e) {
+  for (var i = 0, component; component = this.components[i++];) {
+    if (component.handleKeyDown(e)) {
+      return false;
+    }
+  }
+  return true;
 };
 
 
@@ -212,6 +283,10 @@ loop.audio.Looper = function() {
 
   this.selectionMin = 0;
   this.selectionMax = 0;
+
+  this.handlingSelection = false;
+  this.handlingInit = -1;
+  this.handlingEnd = -1;
 };
 lib.inherits(loop.audio.Looper, lib.ui.Component);
 
@@ -372,9 +447,54 @@ loop.audio.Looper.prototype.render = function() {
   }
 };
 
+loop.audio.Looper.prototype.handleMouseDown = function(e, tx, ty) {
+  this.handlingSelection = true;
+  this.handlingInit = tx;
+};
+
+loop.audio.Looper.prototype.handleMouseMove = function(e, tx, ty) {
+  if (!this.handlingSelection) {
+    return;
+  }
+  this.handlingEnd = tx;
+
+  var min = Math.min(this.handlingInit, this.handlingEnd);
+  var max = Math.max(this.handlingInit, this.handlingEnd);
+  this.selecting(min, max);
+};
+
+loop.audio.Looper.prototype.handleMouseUp = function(e, tx, ty) {
+  this.handlingSelection = false;
+  if (this.handlingInit == this.handlingEnd) {
+    this.deselect();
+  } else {
+    this.select();
+  }
+  this.handlingInit = -1;
+  this.handlingEnd = -1;
+};
+
+loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
+  if (e.shiftKey) {
+    this.subselect(tx);
+  }
+};
+
+
+loop.audio.Looper.prototype.handleKeyDown = function(e) {
+  if (e.keyCode == 82) {  // R
+    loop.audio.core.looper.startRecording();
+  } else if (e.keyCode == 32) {  // Space
+    loop.audio.core.looper.toggleCurrentState();
+  } else {
+    return false;
+  }
+  return true;
+};
+
+
 
 namespace('loop.audio.core');
-
 loop.audio.core.context = (function() {
   return new (window.AudioContext || window.webkitAudioContext)();
 })();
@@ -385,73 +505,22 @@ loop.audio.core.getUserMedia = (
 loop.audio.core.looper = new loop.audio.Looper();
 
 
-namespace('loop.events');
-
-loop.events.handling = false;
-loop.events.initX = -1;
-loop.events.endX = -1;
-
-loop.events.onMouseDown = function(e) {
-  loop.events.handling = true;
-  loop.events.initX = e.clientX;
-};
-
-loop.events.onMouseMove = function(e) {
-  if (!loop.events.handling) {
-    return;
-  }
-  loop.events.endX = e.clientX;
-
-  var min = Math.min(loop.events.initX, loop.events.endX);
-  var max = Math.max(loop.events.initX, loop.events.endX);
-  loop.audio.core.looper.selecting(min, max);
-};
-
-loop.events.onMouseUp = function(e) {
-  loop.events.handling = false;
-  if (loop.events.initX == loop.events.endX) {
-    loop.audio.core.looper.deselect();
-  } else {
-    loop.audio.core.looper.select();
-  }
-  loop.events.initX = -1;
-  loop.events.endX = -1;
-};
-
-loop.events.onClick = function(e) {
-  if (e.shiftKey) {
-    loop.audio.core.looper.subselect(e.clientX);
-  }
-};
-
-loop.events.onKeyDown = function(e) {
-  switch (e.keyCode) {
-    case 82:  // R
-      loop.audio.core.looper.startRecording();
-      break;
-    case 32:  // Space
-      loop.audio.core.looper.toggleCurrentState();
-      break;
-    default:
-      break;
-  }
-};
-
-
 namespace('loop.main');
 loop.main = function() {
   loop.audio.core.looper.init();
   lib.ui.init();
-  lib.ui.renderer.components.push(loop.audio.core.looper);
+  lib.ui.maestro.components.push(loop.audio.core.looper);
+
+  // Global events.
+  window.addEventListener('resize', lib.ui.resize);
+
+  // Mouse and key events.
+  window.addEventListener('mousedown', lib.ui.maestro.handleMouseDown.bind(lib.ui.maestro));
+  window.addEventListener('mousemove', lib.ui.maestro.handleMouseMove.bind(lib.ui.maestro));
+  window.addEventListener('mouseup', lib.ui.maestro.handleMouseUp.bind(lib.ui.maestro));
+  window.addEventListener('click', lib.ui.maestro.handleClick.bind(lib.ui.maestro));
+  window.addEventListener('keydown', lib.ui.maestro.handleKeyDown.bind(lib.ui.maestro));
 };
 
-
-// Global events.
+// Start the show.
 window.addEventListener('load', loop.main);
-window.addEventListener('resize', lib.ui.resize);
-
-window.addEventListener('mousedown', loop.events.onMouseDown);
-window.addEventListener('mousemove', loop.events.onMouseMove);
-window.addEventListener('mouseup', loop.events.onMouseUp);
-window.addEventListener('click', loop.events.onClick);
-window.addEventListener('keydown', loop.events.onKeyDown);
