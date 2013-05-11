@@ -512,11 +512,8 @@ loop.audio.Looper.prototype.handleKeyDown = function(e) {
 };
 
 
-
 namespace('loop.audio.core');
-loop.audio.core.context = (function() {
-  return new (window.AudioContext || window.webkitAudioContext)();
-})();
+loop.audio.core.context = new (window.AudioContext || window.webkitAudioContext)();
 
 loop.audio.core.getUserMedia = (
     navigator.getUserMedia || navigator.webkitGetUserMedia).bind(navigator);
