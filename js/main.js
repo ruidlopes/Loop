@@ -444,10 +444,6 @@ loop.audio.Looper.prototype.select = function() {
 };
 
 loop.audio.Looper.prototype.render = function() {
-  lib.ui.ctx.lineWidth = 1.0;
-  lib.ui.ctx.strokeStyle = '#69c';
-  lib.ui.ctx.strokeRect(0, 0, this.rect.width, this.rect.height);
-
   lib.ui.ctx.fillStyle = '#9cf';
   lib.ui.ctx.fillRect(1, 1, this.rect.width - 2, this.rect.height - 2);
 
@@ -472,6 +468,10 @@ loop.audio.Looper.prototype.render = function() {
     }
     lib.ui.ctx.stroke();
   }
+
+  lib.ui.ctx.lineWidth = 1.0;
+  lib.ui.ctx.strokeStyle = '#69c';
+  lib.ui.ctx.strokeRect(0, 0, this.rect.width, this.rect.height);
 };
 
 loop.audio.Looper.prototype.handleMouseDown = function(e, tx, ty) {
