@@ -1,4 +1,4 @@
-// Loop - main.js
+// Loop - Audio loop recording/playing/slicing.
 // Copyright (c) Rui Lopes 2013
 // Contact: ruidlopes@gmail.com
 // MIT-style license.
@@ -13,7 +13,7 @@ var namespace = function(ns) {
 
 namespace('lib');
 lib.inherits = function(child, base) {
-    child.prototype = Object.create(base.prototype);
+  child.prototype = Object.create(base.prototype);
 };
 
 namespace('lib.functions');
@@ -22,7 +22,7 @@ lib.functions.constant = function(value) {
     return value;
   };
 };
-lib.functions.EMPTY = lib.functions.constant(undefined);
+lib.functions.EMPTY = lib.functions.constant();
 lib.functions.TRUE = lib.functions.constant(true);
 lib.functions.FALSE = lib.functions.constant(false);
 
@@ -498,7 +498,6 @@ loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
     this.subselect(tx);
   }
 };
-
 
 loop.audio.Looper.prototype.handleKeyDown = function(e) {
   if (e.keyCode == 82) {  // R
