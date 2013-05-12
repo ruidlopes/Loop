@@ -501,8 +501,10 @@ loop.audio.Looper.prototype.subselect = function(x) {
 
 loop.audio.Looper.prototype.select = function() {
   if (this.useSelection) {
-    this.stopPlaying();
-    this.startPlaying();
+    if (this.isPlaying) {
+      this.stopPlaying();
+      this.startPlaying();
+    }
   }
   this.useSelection = true;
 };
