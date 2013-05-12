@@ -135,6 +135,33 @@ lib.ui.Component.prototype.handleWheel = lib.functions.FALSE;
 lib.ui.Component.prototype.handleKeyDown = lib.functions.FALSE;
 
 
+namespace('lib.ui.Viewport');
+lib.ui.Viewport = function(id) {
+  lib.ui.Component.call(this, id);
+
+  this.viewportX = 0;
+  this.viewportY = 0;
+  this.viewportEnabled = false;
+};
+lib.inherits(lib.ui.Viewport, lib.ui.Component);
+
+lib.ui.Viewport.prototype.handleWheel = function(e, tx, ty, wheelX, wheelY) {
+  if (!this.viewportEnabled) {
+    return;
+  }
+  this.viewportX = Math.max(0, this.viewportX - wheelX);
+  this.viewportY = Math.max(0, this.viewportY - wheelY);
+};
+
+lib.ui.Viewport.prototype.viewportTranslateX = function(x) {
+  return this.viewportEnabled ? this.viewportX + x : x;
+};
+
+lib.ui.Viewport.prototype.viewportTranslateY = function(y) {
+  return this.viewportEnabled ? this.viewportY + y : y;
+};
+
+
 namespace('lib.ui.Maestro');
 lib.ui.Maestro = function() {
   this.components = [];
@@ -272,7 +299,7 @@ loop.audio.SampleProcessThread.prototype.run = function(data) {
 
   for (var i = 0, count = 1, invCount = 1, len = sample.length;
        i < len;
-       i+= 2, count++, invCount = 1 / count) {
+       i += 2, count++, invCount = 1 / count) {
     leftAverage += (sample[i] - leftAverage) * invCount;
     rightAverage += (sample[i + 1] - rightAverage) * invCount;
   }
@@ -305,7 +332,7 @@ loop.audio.Sample.prototype.update = function(index, left, right) {
 
 namespace('loop.audio.Looper');
 loop.audio.Looper = function() {
-  lib.ui.Component.call(this, 'looper');
+  lib.ui.Viewport.call(this, 'looper');
 
   this.thread = null;
   this.samples = [];
@@ -329,7 +356,7 @@ loop.audio.Looper = function() {
   this.handlingInit = -1;
   this.handlingEnd = -1;
 };
-lib.inherits(loop.audio.Looper, lib.ui.Component);
+lib.inherits(loop.audio.Looper, lib.ui.Viewport);
 
 loop.audio.Looper.prototype.init = function() {
   this.thread = new loop.audio.SampleProcessThread(this.result.bind(this));
@@ -366,6 +393,11 @@ loop.audio.Looper.prototype.onAudioRecord = function(e) {
 
   this.samples.push(sample);
   this.thread.start({index: index, sample: data});
+
+  if (index > this.rect.width) {
+    this.viewportEnabled = true;
+    this.viewportX++;
+  }
 };
 
 loop.audio.Looper.prototype.onAudioPlayback = function(e) {
@@ -383,6 +415,10 @@ loop.audio.Looper.prototype.onAudioPlayback = function(e) {
   } else {
     this.playerPosition = (this.playerPosition + 1) % size;
   }
+  if (this.playerPosition > this.viewportX + this.rect.width) {
+    this.viewportEnabled = true;
+    this.viewportX++;
+  }
 };
 
 loop.audio.Looper.prototype.startRecording = function() {
@@ -394,6 +430,8 @@ loop.audio.Looper.prototype.startRecording = function() {
   }
   this.deselect();
   this.samples = [];
+  this.viewportEnabled = false;
+  this.viewportX = 0;
   this.isRecording = true;
   this.recorder.connect(loop.audio.core.context.destination);
 };
@@ -440,22 +478,23 @@ loop.audio.Looper.prototype.deselect = function() {
 };
 
 loop.audio.Looper.prototype.selecting = function(min, max) {
-  this.selectionMin = Math.min(min, this.samples.length);
-  this.selectionMax = Math.min(max, this.samples.length);
+  this.selectionMin = this.viewportTranslateX(Math.min(min, this.samples.length));
+  this.selectionMax = this.viewportTranslateX(Math.min(max, this.samples.length));
 };
 
 loop.audio.Looper.prototype.subselect = function(x) {
-  if (x < this.selectionMin) {
-    this.selectionMin = x;
+  var tx = this.viewportTranslateX(x);
+  if (tx < this.selectionMin) {
+    this.selectionMin = tx;
   } else if (x > this.selectionMax) {
-    this.selectionMax = x;
+    this.selectionMax = tx;
   } else {
-    var dxMin = x - this.selectionMin;
-    var dxMax = this.selectionMax - x;
+    var dxMin = tx - this.selectionMin;
+    var dxMax = this.selectionMax - tx;
     if (dxMin < dxMax) {
-      this.selectionMin = x;
+      this.selectionMin = tx;
     } else {
-      this.selectionMax = x;
+      this.selectionMax = tx;
     }
   }
 };
@@ -469,32 +508,45 @@ loop.audio.Looper.prototype.select = function() {
 };
 
 loop.audio.Looper.prototype.render = function() {
-  lib.ui.ctx.fillStyle = '#9cf';
-  lib.ui.ctx.fillRect(1, 1, this.rect.width - 2, this.rect.height - 2);
-
   var middle = this.rect.height * 0.5;
 
-  for (var i = 0; i < this.samples.length; ++i) {
-    var left = this.samples[i].leftAverage;
-    var right = this.samples[i].rightAverage;
+  // Background
+  lib.ui.ctx.fillStyle = '#9cf';
+  lib.ui.ctx.fillRect(0, 0, this.rect.width, this.rect.height);
+
+  lib.ui.ctx.lineWidth = 1.0;
+  lib.ui.ctx.strokeStyle = '#69c';
+  lib.ui.ctx.strokeRect(0, middle, this.rect.width, middle);
+
+  // Samples
+  var viewportSampleIndex = this.viewportTranslateX(0);
+  for (var i = 0, sample, count = Math.min(this.samples.length, this.rect.width);
+       (sample = this.samples[i + viewportSampleIndex]) && i < count;
+       ++i) {
+    var left = sample.leftAverage;
+    var right = sample.rightAverage;
 
     lib.ui.ctx.beginPath();
     lib.ui.ctx.moveTo(i, middle - (Math.abs(left * 20) * middle));
     lib.ui.ctx.lineTo(i, middle + (Math.abs(right * 20) * middle));
     lib.ui.ctx.closePath();
 
-    if (this.isPlaying && i >= this.selectionMin && i <= this.playerPosition) {
+    var viewportI = this.viewportTranslateX(i);
+
+    if (this.isPlaying && viewportI >= this.selectionMin && viewportI <= this.playerPosition) {
+      // Playing
       lib.ui.ctx.strokeStyle = '#c00';
     } else if (this.selectionMin != this.selectionMax &&
-        i >= this.selectionMin && i <= this.selectionMax) {
+        viewportI >= this.selectionMin && viewportI <= this.selectionMax) {
+      // Selection
       lib.ui.ctx.strokeStyle = '#369';
     } else {
+      // Recording
       lib.ui.ctx.strokeStyle = '#69c';
     }
     lib.ui.ctx.stroke();
   }
 
-  lib.ui.ctx.lineWidth = 1.0;
   lib.ui.ctx.strokeStyle = '#69c';
   lib.ui.ctx.strokeRect(0, 0, this.rect.width, this.rect.height);
 };
@@ -526,15 +578,16 @@ loop.audio.Looper.prototype.handleMouseUp = function(e, tx, ty) {
   this.handlingEnd = -1;
 };
 
+loop.audio.Looper.prototype.handleWheel = function(e, tx, ty, wheelX, wheelY) {
+  if (wheelX < 0 && this.samples.length - this.viewportX < this.rect.width) {
+    return;
+  }
+  lib.ui.Viewport.prototype.handleWheel.call(this, e, tx, ty, wheelX, wheelY);
+};
+
 loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
   if (e.shiftKey) {
     this.subselect(tx);
-  }
-};
-
-loop.audio.Looper.prototype.handleWheel = function(e, tx, ty, wheelX, wheelY) {
-  if (!wheelX) {
-    return;
   }
 };
 
