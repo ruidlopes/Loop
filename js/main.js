@@ -560,8 +560,12 @@ loop.audio.Looper.prototype.render = function() {
 };
 
 loop.audio.Looper.prototype.handleMouseDown = function(e, tx, ty) {
+  if (e.shiftKey) {
+    return;
+  }
   this.handlingSelection = true;
   this.handlingInit = tx;
+  this.handlingEnd = tx;
 };
 
 loop.audio.Looper.prototype.handleMouseMove = function(e, tx, ty) {
@@ -582,8 +586,6 @@ loop.audio.Looper.prototype.handleMouseUp = function(e, tx, ty) {
   } else {
     this.select();
   }
-  this.handlingInit = -1;
-  this.handlingEnd = -1;
 };
 
 loop.audio.Looper.prototype.handleWheel = function(e, tx, ty, wheelX, wheelY) {
