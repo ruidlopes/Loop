@@ -527,13 +527,15 @@ loop.audio.Looper.prototype.render = function() {
     var right = sample.rightAverage;
 
     var viewportI = this.viewportTranslateX(i);
-    var lineMinY = middle - (Math.abs(left * 20) * middle);
-    var lineMaxY = middle + (Math.abs(left * 20) * middle);
 
     if (this.isPlaying && viewportI == this.playerPosition) {
+      lib.ui.ctx.strokeStyle = '#c88';
+      lib.ui.ctx.beginPath();
+      lib.ui.ctx.moveTo(i, 0);
+      lib.ui.ctx.lineTo(i, this.rect.height);
+      lib.ui.ctx.closePath();
+      lib.ui.ctx.stroke();
       // Playing
-      lineMinY = 0;
-      lineMaxY = this.rect.height;
       lib.ui.ctx.strokeStyle = '#c00';
     } else if (this.selectionMin != this.selectionMax &&
         viewportI >= this.selectionMin && viewportI <= this.selectionMax) {
@@ -545,8 +547,8 @@ loop.audio.Looper.prototype.render = function() {
     }
 
     lib.ui.ctx.beginPath();
-    lib.ui.ctx.moveTo(i, lineMinY);
-    lib.ui.ctx.lineTo(i, lineMaxY);
+    lib.ui.ctx.moveTo(i, middle - (Math.abs(left * 20) * middle));
+    lib.ui.ctx.lineTo(i, middle + (Math.abs(left * 20) * middle));
     lib.ui.ctx.closePath();
     lib.ui.ctx.stroke();
   }
