@@ -617,6 +617,20 @@ loop.audio.Looper.prototype.stopAnything = function() {
   }
 };
 
+loop.audio.Looper.prototype.scrollToBeginning = function() {
+  if (this.isRecording || !this.viewportEnabled) {
+    return;
+  }
+  this.viewportX = 0;
+};
+
+loop.audio.Looper.prototype.scrollToEnd = function() {
+  if (this.isRecording || !this.viewportEnabled) {
+    return;
+  }
+  this.viewportX = Math.max(0, this.samples.length - this.rect.width);
+};
+
 loop.audio.Looper.prototype.toggleCurrentState = function() {
   if (this.isRecording) {
     this.stopRecording();
@@ -767,6 +781,12 @@ loop.audio.Looper.prototype.handleKeyDown = function(e) {
       break;
     case 27: // Esc
       this.stopAnything();
+      break;
+    case 36: // Home
+      this.scrollToBeginning();
+      break;
+    case 35: // End
+      this.scrollToEnd();
       break;
     default:
       break;
