@@ -396,7 +396,7 @@ loop.audio.AiffEncoder = function() {
 lib.inherits(loop.audio.AiffEncoder, loop.audio.Encoder);
 
 loop.audio.AiffEncoder.prototype.computeParts = function(samples, init, end) {
-  // Based on http://www.onicos.com/staff/iz/formats/aiff.html
+  // Based on http://muratnkonar.com/aiff/index.html
   var parts = [];
 
   var samplesCount = end - init;
