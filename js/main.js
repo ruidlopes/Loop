@@ -17,6 +17,11 @@ lib.inherits = function(child, base) {
 };
 
 namespace('lib.functions');
+lib.functions.error = function(value) {
+  return function() {
+    throw Error(value);
+  };
+};
 lib.functions.constant = function(value) {
   return function() {
     return value;
@@ -25,6 +30,30 @@ lib.functions.constant = function(value) {
 lib.functions.EMPTY = lib.functions.constant();
 lib.functions.TRUE = lib.functions.constant(true);
 lib.functions.FALSE = lib.functions.constant(false);
+
+namespace('lib.assert');
+lib.assert.exists = function(thing) {
+  if (!thing) {
+    lib.functions.error('Value does not exist.');
+  };
+};
+
+namespace('lib.binary');
+lib.binary.uint16 = function(value) {
+  return new Uint8Array([
+      0xff & value >> 8,
+      0xff & value
+  ]);
+};
+
+lib.binary.uint32 = function(value) {
+  return new Uint8Array([
+      0xff & value >> 24,
+      0xff & value >> 16,
+      0xff & value >> 8,
+      0xff & value
+  ]);
+};
 
 
 namespace('lib.threads.Thread');
@@ -330,15 +359,120 @@ loop.audio.Sample.prototype.update = function(index, left, right) {
 };
 
 
+namespace('loop.audio.Encoder');
+loop.audio.Encoder = function(type) {
+  this.type = type;
+  this.blob = null;
+};
+
+loop.audio.Encoder.prototype.asDataUrl = function(callback) {
+  lib.assert.exists(this.blob);
+
+  // TODO: revoke the object URL asynchronously.
+  callback(URL.createObjectURL(this.blob));
+};
+
+loop.audio.Encoder.prototype.asBinaryString = function(callback) {
+  lib.assert.exists(this.blob);
+
+  var reader = new FileReader();
+  reader.onload = function() {
+    callback(reader.result);
+  };
+  reader.readAsBinaryString();
+};
+
+loop.audio.Encoder.prototype.encode = function(samples, init, end) {
+  this.blob = new Blob(this.computeParts(samples, init, end), {type: this.type});
+};
+
+loop.audio.Encoder.prototype.computeParts = lib.functions.constant([]);
+
+
+namespace('loop.audio.AiffEncoder');
+loop.audio.AiffEncoder = function() {
+  loop.audio.Encoder.call(this, 'audio/aiff');
+};
+lib.inherits(loop.audio.AiffEncoder, loop.audio.Encoder);
+
+loop.audio.AiffEncoder.prototype.computeParts = function(samples, init, end) {
+  // Based on http://www.onicos.com/staff/iz/formats/aiff.html
+  var parts = [];
+
+  var samplesCount = end - init;
+
+  var commChunkSize = 18;
+  var commSize = 4 + 4 + commChunkSize;
+
+  // samples * 512 frames  * 32 bit + 8 padding bytes (offset, blockSize)
+  var ssndChunkSize = samplesCount * 512 * 4 + 8;
+  var ssndSize = 4 + 4 + ssndChunkSize;
+
+  // sizeof(COMM) + sizeof(SSND)
+  var fileSize = commSize + ssndSize;
+
+  // Header
+  parts.push('FORM');
+  // COMM + all SSND
+  parts.push(lib.binary.uint32(fileSize));
+  parts.push('AIFF');
+
+  // Common Chunk
+  parts.push('COMM');
+  // 18 bytes in this chunk
+  parts.push(lib.binary.uint32(commChunkSize));
+  // Mono
+  parts.push(lib.binary.uint16(1));
+  // # frames = samples * 512 entries per sample / mono
+  parts.push(lib.binary.uint32(samplesCount * 512 / 1));
+  // 32 bits per sample
+  parts.push(lib.binary.uint16(32));
+  // Sample rate, 44100 (80-bit IEEE encoding)
+  parts.push(new Uint8Array([0x40, 0x0E, 0xAC, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]));
+
+  // Sound Data Chunk
+  parts.push('SSND');
+  // Lots of bytes in this chunk
+  parts.push(lib.binary.uint32(ssndChunkSize));
+  // Offset (always zero)
+  parts.push(lib.binary.uint32(0));
+  // Block size (always zero)
+  parts.push(lib.binary.uint32(0));
+
+  for (var i = 0; i < end; ++i) {
+    // Recorded samples
+    parts.push(this.computeSample(samples[i + init].sample));
+  }
+
+  return parts;
+};
+
+loop.audio.AiffEncoder.prototype.computeSample = function(sample) {
+  var output = new Uint8Array(sample.length * 4);
+
+  for (var i = 0; i < sample.length; ++i) {
+    // Two's complement conversion between [-1, 1] and 32-bit signed int.
+    var value = Math.floor((Math.pow(2, 30) - 1) * (1 + sample[i]));
+    output[i * 4 + 0] = 0xff & value >> 24;
+    output[i * 4 + 1] = 0xff & value >> 16;
+    output[i * 4 + 2] = 0xff & value >> 8;
+    output[i * 4 + 3] = 0xff & value;
+  }
+
+  return output;
+};
+
+
 namespace('loop.audio.Looper');
 loop.audio.Looper = function() {
   lib.ui.Viewport.call(this, 'looper');
 
   this.thread = null;
   this.samples = [];
+  this.encoder = new loop.audio.AiffEncoder();
 
   this.gain = loop.audio.core.context.createGain();
-  this.gain.gain.value = 10.0;
+  this.gain.gain.value = 5.0;
 
   this.recorder = loop.audio.core.context.createScriptProcessor(512, 1, 1);
   this.recorder.onaudioprocess = this.onAudioRecord.bind(this);
@@ -349,6 +483,7 @@ loop.audio.Looper = function() {
   this.isPlaying = false;
   this.playerPosition = 0;
 
+  this.useSelection = false;
   this.selectionMin = 0;
   this.selectionMax = 0;
 
@@ -382,6 +517,27 @@ loop.audio.Looper.prototype.error = function() {
   console.log('error');
 };
 
+loop.audio.Looper.prototype.download = function(opt_selection) {
+  if (!this.samples.length) {
+    return;
+  }
+
+  var sampleInit = this.useSelection && opt_selection ? this.selectionMin : 0;
+  var sampleEnd = this.useSelection && opt_selection ? this.selectionMax : this.samples.length;
+  this.encoder.encode(this.samples, sampleInit, sampleEnd);
+  this.encoder.asDataUrl(this.downloadReady);
+};
+
+loop.audio.Looper.prototype.downloadReady = function(dataUrl) {
+  var downloadLink = document.createElement('a');
+  downloadLink.href = dataUrl;
+  downloadLink.download = 'loop.aiff';
+
+  var e = document.createEvent('MouseEvents');
+  e.initEvent('click', true, true);
+  downloadLink.dispatchEvent(e);
+};
+
 loop.audio.Looper.prototype.onAudioRecord = function(e) {
   if (!this.isRecording) {
     return;
@@ -402,7 +558,7 @@ loop.audio.Looper.prototype.onAudioRecord = function(e) {
 
 loop.audio.Looper.prototype.onAudioPlayback = function(e) {
   var size = this.samples.length;
-  if (!this.isPlaying || !size) {
+  if (!this.isPlaying || !size || this.playerPosition >= size) {
     return;
   }
   var data = e.outputBuffer.getChannelData(e);
