@@ -326,11 +326,8 @@ loop.audio.SampleProcessThread.prototype.run = function(data) {
   var leftAverage = 0;
   var rightAverage = 0;
 
-  for (var i = 0, count = 1, invCount = 1, len = sample.length;
-       i < len;
-       i += 2, count++, invCount = 1 / count) {
-    leftAverage += (sample[i] - leftAverage) * invCount;
-    rightAverage += (sample[i + 1] - rightAverage) * invCount;
+  for (var i = 0, inv = 1, len = sample.length; i < len; i++, inv = 1 / i) {
+    leftAverage += (sample[i] - leftAverage) * inv;
   }
   return {
     index: index,
@@ -720,7 +717,7 @@ loop.audio.Looper.prototype.render = function() {
 
     lib.ui.ctx.beginPath();
     lib.ui.ctx.moveTo(i, middle - (Math.abs(left * 20) * middle));
-    lib.ui.ctx.lineTo(i, middle + (Math.abs(left * 20) * middle));
+    lib.ui.ctx.lineTo(i, middle + (Math.abs(right * 20) * middle));
     lib.ui.ctx.closePath();
     lib.ui.ctx.stroke();
   }
