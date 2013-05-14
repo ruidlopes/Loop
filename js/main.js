@@ -436,7 +436,7 @@ loop.audio.AiffEncoder.prototype.computeParts = function(samples, init, end) {
   // Block size (always zero)
   parts.push(lib.binary.uint32(0));
 
-  for (var i = 0; i < end; ++i) {
+  for (var i = 0; i < samplesCount; ++i) {
     // Recorded samples
     parts.push(this.computeSample(samples[i + init].sample));
   }
