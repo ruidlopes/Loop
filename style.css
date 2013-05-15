@@ -26,6 +26,26 @@ canvas {
   position: absolute;
 }
 
+define .item-background {
+  color: #9cf;
+}
+
+define .item-standby {
+  color: #69c;
+}
+
+define .item-highlight {
+  color: #369;
+}
+
+define .looper-marker-standby {
+  color: #c88;
+}
+
+define .looper-marker-highlight {
+  color: #c00;
+}
+
 #looper {
   top: 50px;
   left: 50px;

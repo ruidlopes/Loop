@@ -112,6 +112,7 @@ lib.ui.init = function() {
   lib.ui.canvas = document.querySelector('canvas');
   lib.ui.ctx = lib.ui.canvas.getContext('2d');
 
+  lib.ui.style.parse();
   lib.ui.resize();
 
   (function __loop() {
@@ -124,6 +125,42 @@ lib.ui.resize = function() {
   lib.ui.width = lib.ui.canvas.width = document.width;
   lib.ui.height = lib.ui.canvas.height = document.height;
   lib.ui.maestro.resize();
+};
+
+
+namespace('lib.ui.style');
+lib.ui.style.defs = {};
+lib.ui.style.defRE = /^\s*define\s+\.(.+)/;
+lib.ui.style.camelRE = /-([a-z])/g;
+lib.ui.style.cache = {};
+
+lib.ui.style.parse = function() {
+  for (var i = 0, stylesheet; stylesheet = document.styleSheets[i++];) {
+    lib.ui.style.parseStylesheet(stylesheet);
+  }
+};
+
+lib.ui.style.parseStylesheet = function(stylesheet) {
+  for (var i = 0, rule; rule = stylesheet.cssRules[i++];) {
+    lib.ui.style.parseRule(rule);
+  }
+};
+
+lib.ui.style.parseRule = function(rule) {
+  var match = lib.ui.style.defRE.exec(rule.selectorText);
+  if (!match) {
+    return;
+  }
+  var def = match[1];
+  var camelDef = def.replace(lib.ui.style.camelRE, function(m, letter) {
+    return letter.toUpperCase();
+  });
+  lib.ui.style.defs[camelDef] = rule.style;
+};
+
+lib.ui.style.get = function(def, property) {
+  var key = def + '-' + property;
+  return lib.ui.style.cache[key] = lib.ui.style.cache[key] || lib.ui.style.defs[def][property];
 };
 
 
@@ -680,11 +717,11 @@ loop.audio.Looper.prototype.render = function() {
   var middle = this.rect.height * 0.5;
 
   // Background
-  lib.ui.ctx.fillStyle = '#9cf';
+  lib.ui.ctx.fillStyle = lib.ui.style.get('itemBackground', 'color');
   lib.ui.ctx.fillRect(0, 0, this.rect.width, this.rect.height);
 
   lib.ui.ctx.lineWidth = 1.0;
-  lib.ui.ctx.strokeStyle = '#69c';
+  lib.ui.ctx.strokeStyle = lib.ui.style.get('itemStandby', 'color');
   lib.ui.ctx.strokeRect(0, middle, this.rect.width, middle);
 
   // Samples
@@ -698,21 +735,21 @@ loop.audio.Looper.prototype.render = function() {
     var viewportI = this.viewportTranslateX(i);
 
     if (this.isPlaying && viewportI == this.playerPosition) {
-      lib.ui.ctx.strokeStyle = '#c88';
+      lib.ui.ctx.strokeStyle = lib.ui.style.get('looperMarkerStandby', 'color');
       lib.ui.ctx.beginPath();
       lib.ui.ctx.moveTo(i, 0);
       lib.ui.ctx.lineTo(i, this.rect.height);
       lib.ui.ctx.closePath();
       lib.ui.ctx.stroke();
       // Playing
-      lib.ui.ctx.strokeStyle = '#c00';
+      lib.ui.ctx.strokeStyle = lib.ui.style.get('looperMarkerHighlight', 'color');
     } else if (this.selectionMin != this.selectionMax &&
         viewportI >= this.selectionMin && viewportI <= this.selectionMax) {
       // Selection
-      lib.ui.ctx.strokeStyle = '#369';
+      lib.ui.ctx.strokeStyle = lib.ui.style.get('itemHighlight', 'color');
     } else {
       // Recording
-      lib.ui.ctx.strokeStyle = '#69c';
+      lib.ui.ctx.strokeStyle = lib.ui.style.get('itemStandby', 'color');
     }
 
     lib.ui.ctx.beginPath();
