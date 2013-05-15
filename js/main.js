@@ -18,9 +18,7 @@ lib.inherits = function(child, base) {
 
 namespace('lib.functions');
 lib.functions.error = function(value) {
-  return function() {
-    throw Error(value);
-  };
+  throw Error(value);
 };
 lib.functions.constant = function(value) {
   return function() {
@@ -38,6 +36,12 @@ lib.assert.exists = function(thing) {
   };
 };
 
+lib.assert.true = function(condition) {
+  if (condition !== true) {
+    lib.functions.error('Value is not strictly true.');
+  }
+};
+
 namespace('lib.binary');
 lib.binary.uint16 = function(value) {
   return new Uint8Array([
@@ -53,6 +57,30 @@ lib.binary.uint32 = function(value) {
       0xff & value >> 8,
       0xff & value
   ]);
+};
+
+
+namespace('lib.msg');
+lib.msg.handlers = {};
+lib.msg.types = [];
+
+lib.msg.listen = function(msg, handler) {
+  lib.msg.handlers[msg] = lib.msg.handlers[msg] || [];
+  lib.msg.handlers[msg].push(handler);
+};
+
+lib.msg.send = function(msg) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  for (var i = 0, handler; handler = lib.msg.handlers[msg][i++];) {
+    handler.apply(null, args);
+  };
+};
+
+lib.msg.register = function(types) {
+  for (var type in types) {
+    lib.assert.true(lib.msg.types.indexOf(types[type]) < 0);
+    lib.msg.types.push(types[type]);
+  }
 };
 
 
@@ -164,9 +192,10 @@ lib.ui.Component = function(id, opt_parent) {
   this.id = id;
   this.element = null;
   this.rect = null;
+  this.visible = true;
 
-  this.components = [];
   this.parent = opt_parent || null;
+  this.components = [];
 
   this.create();
 };
@@ -183,9 +212,10 @@ lib.ui.Component.prototype.create = function() {
 lib.ui.Component.prototype.addComponent = function(child) {
   if (!child.parent) {
     child.parent = this;
-    child.parent.element.removeChild(child.element);
+    child.element.parentElement.removeChild(child.element);
     this.element.appendChild(child.element);
   }
+  this.components.push(child);
 };
 
 lib.ui.Component.prototype.computeRect = function() {
@@ -211,6 +241,11 @@ lib.ui.Component.prototype.tY = function(y) {
 };
 
 lib.ui.Component.prototype.renderInternal = function() {
+  if (!this.visible) {
+    return;
+  }
+
+  lib.ui.ctx.save();
   lib.ui.ctx.beginPath();
   lib.ui.ctx.rect(this.rect.left, this.rect.top, this.rect.width, this.rect.height);
   lib.ui.ctx.clip();
@@ -220,12 +255,18 @@ lib.ui.Component.prototype.renderInternal = function() {
   this.render();
   lib.ui.ctx.restore();
 
+  lib.ui.ctx.restore();
+
   for (var i = 0, child; child = this.components[i++];) {
     child.renderInternal();
   }
 };
 
 lib.ui.Component.prototype.handleMouseDownInternal = function(e) {
+  if (!this.visible) {
+    return;
+  }
+
   for (var i = 0, child; child = this.components[i++];) {
     if (child.handleMouseDownInternal.bind(child)(e)) {
       return true;
@@ -236,6 +277,10 @@ lib.ui.Component.prototype.handleMouseDownInternal = function(e) {
 };
 
 lib.ui.Component.prototype.handleMouseMoveInternal = function(e) {
+  if (!this.visible) {
+    return;
+  }
+
   for (var i = 0, child; child = this.components[i++];) {
     if (child.handleMouseMoveInternal.bind(child)(e)) {
       return true;
@@ -246,6 +291,10 @@ lib.ui.Component.prototype.handleMouseMoveInternal = function(e) {
 };
 
 lib.ui.Component.prototype.handleMouseUpInternal = function(e) {
+  if (!this.visible) {
+    return;
+  }
+
   for (var i = 0, child; child = this.components[i++];) {
     if (child.handleMouseUpInternal.bind(child)(e)) {
       return true;
@@ -256,6 +305,10 @@ lib.ui.Component.prototype.handleMouseUpInternal = function(e) {
 };
 
 lib.ui.Component.prototype.handleClickInternal = function(e) {
+  if (!this.visible) {
+    return;
+  }
+
   for (var i = 0, child; child = this.components[i++];) {
     if (child.handleClickInternal.bind(child)(e)) {
       return true;
@@ -266,6 +319,10 @@ lib.ui.Component.prototype.handleClickInternal = function(e) {
 };
 
 lib.ui.Component.prototype.handleWheelInternal = function(e) {
+  if (!this.visible) {
+    return;
+  }
+
   for (var i = 0, child; child = this.components[i++];) {
     if (child.handleWheelInternal.bind(child)(e)) {
       return true;
@@ -282,6 +339,10 @@ lib.ui.Component.prototype.handleWheelInternal = function(e) {
 };
 
 lib.ui.Component.prototype.handleKeyDownInternal = function(e) {
+  if (!this.visible) {
+    return;
+  }
+
   for (var i = 0, child; child = this.components[i++];) {
     if (child.handleKeyDownInternal.bind(child)(e)) {
       return true;
@@ -326,6 +387,29 @@ lib.ui.Viewport.prototype.viewportTranslateX = function(x) {
 
 lib.ui.Viewport.prototype.viewportTranslateY = function(y) {
   return this.viewportEnabled ? this.viewportY + y : y;
+};
+
+
+namespace('lib.ui.Button');
+lib.ui.Button = function(id, text, opt_parent) {
+  lib.ui.Component.call(this, id, opt_parent);
+
+  this.text = text;
+};
+lib.inherits(lib.ui.Button, lib.ui.Component);
+
+lib.ui.Button.create = function(id, text, handler) {
+  var button = new lib.ui.Button(id, text);
+  button.handleClick = handler;
+  return button;
+};
+
+lib.ui.Button.prototype.render = function() {
+  lib.ui.ctx.font = lib.ui.style.defs.button.font;
+  lib.ui.ctx.textAlign = 'center';
+  lib.ui.ctx.textBaseline = 'middle';
+  lib.ui.ctx.fillStyle = lib.ui.style.defs.itemStandby.color;
+  lib.ui.ctx.fillText(this.text, this.rect.width * 0.5, this.rect.height * 0.5);
 };
 
 
@@ -375,6 +459,12 @@ lib.ui.Maestro.prototype.addEventListeners = function() {
   this.addEventListener('keydown', this.root.handleKeyDownInternal);
 };
 
+
+namespace('loop.audio.msg');
+loop.audio.msg = {
+  SCROLL_TO_BEGINNING: 0x00000001
+};
+lib.msg.register(loop.audio.msg);
 
 namespace('loop.audio.SampleProcessThread');
 loop.audio.SampleProcessThread = function(externalResult) {
@@ -555,6 +645,8 @@ lib.inherits(loop.audio.Looper, lib.ui.Viewport);
 
 loop.audio.Looper.prototype.init = function() {
   this.thread = new loop.audio.SampleProcessThread(this.result.bind(this));
+
+  lib.msg.listen(loop.audio.msg.SCROLL_TO_BEGINNING, this.scrollToBeginning.bind(this));
 
   loop.audio.core.getUserMedia(
       {video: false, audio: true},
@@ -853,7 +945,7 @@ loop.audio.Looper.prototype.handleKeyDown = function(e) {
       this.stopAnything();
       break;
     case 36: // Home
-      this.scrollToBeginning();
+      lib.msg.send(loop.audio.msg.SCROLL_TO_BEGINNING);
       break;
     case 35: // End
       this.scrollToEnd();
@@ -877,6 +969,10 @@ namespace('loop.main');
 loop.main = function() {
   lib.ui.maestro = new lib.ui.Maestro();
   lib.ui.maestro.root = new loop.audio.Looper();
+  lib.ui.maestro.root.addComponent(lib.ui.Button.create('begin', '<<', function() {
+    lib.msg.send(loop.audio.msg.SCROLL_TO_BEGINNING);
+  }));
+
   lib.ui.init();
 
   // Global events.
