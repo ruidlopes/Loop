@@ -131,7 +131,6 @@ lib.ui.resize = function() {
 
 namespace('lib.ui.style');
 lib.ui.style.defs = {};
-lib.ui.style.cache = {};
 lib.ui.style.defRE = /^\s*define\s+\.(.+)/;
 lib.ui.style.camelRE = /-([a-z])/g;
 
@@ -157,11 +156,6 @@ lib.ui.style.parseRule = function(rule) {
     return letter.toUpperCase();
   });
   lib.ui.style.defs[camelDef] = rule.style;
-};
-
-lib.ui.style.get = function(def, property) {
-  var key = def + '-' + property;
-  return lib.ui.style.cache[key] = lib.ui.style.cache[key] || lib.ui.style.defs[def][property];
 };
 
 
@@ -749,11 +743,11 @@ loop.audio.Looper.prototype.render = function() {
   var middle = this.rect.height * 0.5;
 
   // Background
-  lib.ui.ctx.fillStyle = lib.ui.style.get('itemBackground', 'color');
+  lib.ui.ctx.fillStyle = lib.ui.style.defs.itemBackground.color;
   lib.ui.ctx.fillRect(0, 0, this.rect.width, this.rect.height);
 
   lib.ui.ctx.lineWidth = 1.0;
-  lib.ui.ctx.strokeStyle = lib.ui.style.get('itemStandby', 'color');
+  lib.ui.ctx.strokeStyle = lib.ui.style.defs.itemStandby.color;
   lib.ui.ctx.strokeRect(0, middle, this.rect.width, middle);
 
   // Samples
@@ -767,21 +761,21 @@ loop.audio.Looper.prototype.render = function() {
     var viewportI = this.viewportTranslateX(i);
 
     if (this.isPlaying && viewportI == this.playerPosition) {
-      lib.ui.ctx.strokeStyle = lib.ui.style.get('looperMarkerStandby', 'color');
+      lib.ui.ctx.strokeStyle = lib.ui.style.defs.looperMarkerStandby.color;
       lib.ui.ctx.beginPath();
       lib.ui.ctx.moveTo(i, 0);
       lib.ui.ctx.lineTo(i, this.rect.height);
       lib.ui.ctx.closePath();
       lib.ui.ctx.stroke();
       // Playing
-      lib.ui.ctx.strokeStyle = lib.ui.style.get('looperMarkerHighlight', 'color');
+      lib.ui.ctx.strokeStyle = lib.ui.style.defs.looperMarkerHighlight.color;
     } else if (this.selectionMin != this.selectionMax &&
         viewportI >= this.selectionMin && viewportI <= this.selectionMax) {
       // Selection
-      lib.ui.ctx.strokeStyle = lib.ui.style.get('itemHighlight', 'color');
+      lib.ui.ctx.strokeStyle = lib.ui.style.defs.itemHighlight.color;
     } else {
       // Recording
-      lib.ui.ctx.strokeStyle = lib.ui.style.get('itemStandby', 'color');
+      lib.ui.ctx.strokeStyle = lib.ui.style.defs.itemStandby.color;
     }
 
     lib.ui.ctx.beginPath();
@@ -791,7 +785,7 @@ loop.audio.Looper.prototype.render = function() {
     lib.ui.ctx.stroke();
   }
 
-  lib.ui.ctx.strokeStyle = '#69c';
+  lib.ui.ctx.strokeStyle = lib.ui.style.defs.itemStandby.color;
   lib.ui.ctx.strokeRect(0, 0, this.rect.width, this.rect.height);
 };
 
