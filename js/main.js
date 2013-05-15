@@ -30,17 +30,30 @@ lib.functions.TRUE = lib.functions.constant(true);
 lib.functions.FALSE = lib.functions.constant(false);
 
 namespace('lib.assert');
-lib.assert.exists = function(thing) {
-  if (!thing) {
-    lib.functions.error('Value does not exist.');
+lib.assert.exists = function(thing, opt_msg) {
+  if (thing === undefined || thing === null) {
+    lib.functions.error(opt_msg || 'Value does not exist.');
   };
 };
 
-lib.assert.true = function(condition) {
-  if (condition !== true) {
-    lib.functions.error('Value is not strictly true.');
+lib.assert.undefined = function(condition, opt_msg) {
+  if (condition !== undefined) {
+    lib.functions.error(opt_msg || 'Value is defined.');
   }
 };
+
+lib.assert.true = function(condition, opt_msg) {
+  if (condition !== true) {
+    lib.functions.error(opt_msg || 'Value is not strictly true.');
+  }
+};
+
+lib.assert.false = function(condition, opt_msg) {
+  if (condition !== false) {
+    lib.functions.error(opt_msg || 'Value is not strictly false.');
+  }
+};
+
 
 namespace('lib.binary');
 lib.binary.uint16 = function(value) {
@@ -62,14 +75,16 @@ lib.binary.uint32 = function(value) {
 
 namespace('lib.msg');
 lib.msg.handlers = {};
-lib.msg.types = [];
+lib.msg.types = {};
 
 lib.msg.listen = function(msg, handler) {
+  lib.assert.true(lib.msg.types[msg], 'Cannot listen to unregistered message type.');
   lib.msg.handlers[msg] = lib.msg.handlers[msg] || [];
   lib.msg.handlers[msg].push(handler);
 };
 
 lib.msg.send = function(msg) {
+  lib.assert.true(lib.msg.types[msg], 'Cannot send unregistered message type.');
   var args = Array.prototype.slice.call(arguments, 1);
   for (var i = 0, handler; handler = lib.msg.handlers[msg][i++];) {
     handler.apply(null, args);
@@ -78,8 +93,8 @@ lib.msg.send = function(msg) {
 
 lib.msg.register = function(types) {
   for (var type in types) {
-    lib.assert.true(lib.msg.types.indexOf(types[type]) < 0);
-    lib.msg.types.push(types[type]);
+    lib.assert.undefined(lib.msg.types[types[type]], 'Message type already registered.');
+    lib.msg.types[types[type]] = true;
   }
 };
 
@@ -426,17 +441,17 @@ lib.ui.Maestro.prototype.clear = function() {
 };
 
 lib.ui.Maestro.prototype.init = function() {
-  lib.assert.exists(this.root);
+  lib.assert.exists(this.root, 'UI root not defined.');
   this.root.init();
 };
 
 lib.ui.Maestro.prototype.resize = function() {
-  lib.assert.exists(this.root);
+  lib.assert.exists(this.root, 'UI root not defined.');
   this.root.computeRect();
 };
 
 lib.ui.Maestro.prototype.render = function() {
-  lib.assert.exists(this.root);
+  lib.assert.exists(this.root, 'UI root not defined.');
 
   this.clear();
   this.root.renderInternal();
@@ -447,7 +462,8 @@ lib.ui.Maestro.prototype.addEventListener = function(eventType, handler) {
 };
 
 lib.ui.Maestro.prototype.addEventListeners = function() {
-  lib.assert.exists(this.root);
+  lib.assert.exists(this.root, 'UI root not defined.');
+
   this.addEventListener('mousedown', this.root.handleMouseDownInternal);
   this.addEventListener('mousemove', this.root.handleMouseMoveInternal);
   this.addEventListener('mouseup', this.root.handleMouseUpInternal);
@@ -516,14 +532,14 @@ loop.audio.Encoder = function(type) {
 };
 
 loop.audio.Encoder.prototype.asDataUrl = function(callback) {
-  lib.assert.exists(this.blob);
+  lib.assert.exists(this.blob, 'Encoder blob not created.');
 
   // TODO: revoke the object URL asynchronously.
   callback(URL.createObjectURL(this.blob));
 };
 
 loop.audio.Encoder.prototype.asBinaryString = function(callback) {
-  lib.assert.exists(this.blob);
+  lib.assert.exists(this.blob, 'Encoder blob not created.');
 
   var reader = new FileReader();
   reader.onload = function() {
