@@ -130,9 +130,9 @@ lib.ui.resize = function() {
 
 namespace('lib.ui.style');
 lib.ui.style.defs = {};
+lib.ui.style.cache = {};
 lib.ui.style.defRE = /^\s*define\s+\.(.+)/;
 lib.ui.style.camelRE = /-([a-z])/g;
-lib.ui.style.cache = {};
 
 lib.ui.style.parse = function() {
   for (var i = 0, stylesheet; stylesheet = document.styleSheets[i++];) {
@@ -152,7 +152,7 @@ lib.ui.style.parseRule = function(rule) {
     return;
   }
   var def = match[1];
-  var camelDef = def.replace(lib.ui.style.camelRE, function(m, letter) {
+  var camelDef = def.replace(lib.ui.style.camelRE, function(_, letter) {
     return letter.toUpperCase();
   });
   lib.ui.style.defs[camelDef] = rule.style;
