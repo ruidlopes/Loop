@@ -114,6 +114,7 @@ lib.ui.init = function() {
 
   lib.ui.style.parse();
   lib.ui.resize();
+  lib.ui.maestro.init();
 
   (function __loop() {
     lib.ui.requestAnimationFrame(__loop);
@@ -165,10 +166,13 @@ lib.ui.style.get = function(def, property) {
 
 
 namespace('lib.ui.Component');
-lib.ui.Component = function(id) {
+lib.ui.Component = function(id, opt_parent) {
   this.id = id;
   this.element = null;
   this.rect = null;
+
+  this.components = [];
+  this.parent = opt_parent || null;
 
   this.create();
 };
@@ -177,11 +181,24 @@ lib.ui.Component.prototype.create = function() {
   this.element = document.createElement('div');
   this.element.id = this.id;
   this.element.classList.add('component');
-  document.body.appendChild(this.element);
+
+  var parentElement = this.parent ? this.parent.element : document.body;
+  parentElement.appendChild(this.element);
+};
+
+lib.ui.Component.prototype.addComponent = function(child) {
+  if (!child.parent) {
+    child.parent = this;
+    child.parent.element.removeChild(child.element);
+    this.element.appendChild(child.element);
+  }
 };
 
 lib.ui.Component.prototype.computeRect = function() {
   this.rect = this.element.getBoundingClientRect();
+  for (var i = 0, child; child = this.components[i++];) {
+    child.computeRect();
+  }
 };
 
 lib.ui.Component.prototype.isCoordinateWithin = function(x, y) {
@@ -190,6 +207,95 @@ lib.ui.Component.prototype.isCoordinateWithin = function(x, y) {
     y >= this.rect.top &&
     y <= this.rect.bottom;
 };
+
+lib.ui.Component.prototype.tX = function(x) {
+  return x - this.rect.left;
+};
+
+lib.ui.Component.prototype.tY = function(y) {
+  return y - this.rect.top;
+};
+
+lib.ui.Component.prototype.renderInternal = function() {
+  lib.ui.ctx.beginPath();
+  lib.ui.ctx.rect(this.rect.left, this.rect.top, this.rect.width, this.rect.height);
+  lib.ui.ctx.clip();
+
+  lib.ui.ctx.save();
+  lib.ui.ctx.translate(this.rect.left + 0.5, this.rect.top + 0.5);
+  this.render();
+  lib.ui.ctx.restore();
+
+  for (var i = 0, child; child = this.components[i++];) {
+    child.renderInternal();
+  }
+};
+
+lib.ui.Component.prototype.handleMouseDownInternal = function(e) {
+  for (var i = 0, child; child = this.components[i++];) {
+    if (child.handleMouseDownInternal.bind(child)(e)) {
+      return true;
+    }
+  }
+  return this.isCoordinateWithin(e.clientX, e.clientY) &&
+    this.handleMouseDown(e, this.tX(e.clientX), this.tY(e.clientY));
+};
+
+lib.ui.Component.prototype.handleMouseMoveInternal = function(e) {
+  for (var i = 0, child; child = this.components[i++];) {
+    if (child.handleMouseMoveInternal.bind(child)(e)) {
+      return true;
+    }
+  }
+  return this.isCoordinateWithin(e.clientX, e.clientY) &&
+    this.handleMouseMove(e, this.tX(e.clientX), this.tY(e.clientY));
+};
+
+lib.ui.Component.prototype.handleMouseUpInternal = function(e) {
+  for (var i = 0, child; child = this.components[i++];) {
+    if (child.handleMouseUpInternal.bind(child)(e)) {
+      return true;
+    }
+  }
+  return this.isCoordinateWithin(e.clientX, e.clientY) &&
+    this.handleMouseUp(e, this.tX(e.clientX), this.tY(e.clientY));
+};
+
+lib.ui.Component.prototype.handleClickInternal = function(e) {
+  for (var i = 0, child; child = this.components[i++];) {
+    if (child.handleClickInternal.bind(child)(e)) {
+      return true;
+    }
+  }
+  return this.isCoordinateWithin(e.clientX, e.clientY) &&
+    this.handleClick(e, this.tX(e.clientX), this.tY(e.clientY));
+};
+
+lib.ui.Component.prototype.handleWheelInternal = function(e) {
+  for (var i = 0, child; child = this.components[i++];) {
+    if (child.handleWheelInternal.bind(child)(e)) {
+      return true;
+    }
+  }
+
+  var deltaX = e.deltaX || e.wheelDeltaX;
+  var deltaY = e.deltaY || e.wheelDeltaY;
+  var ret = this.isCoordinateWithin(e.clientX, e.clientY) &&
+    this.handleWheel(e, this.tX(e.clientX), this.tY(e.clientY), deltaX, deltaY);
+
+  e.preventDefault();
+  return ret;
+};
+
+lib.ui.Component.prototype.handleKeyDownInternal = function(e) {
+  for (var i = 0, child; child = this.components[i++];) {
+    if (child.handleKeyDownInternal.bind(child)(e)) {
+      return true;
+    }
+  }
+  return this.handleKeyDown(e);
+};
+
 
 lib.ui.Component.prototype.init = lib.functions.EMPTY;
 lib.ui.Component.prototype.render = lib.functions.EMPTY;
@@ -202,8 +308,8 @@ lib.ui.Component.prototype.handleKeyDown = lib.functions.FALSE;
 
 
 namespace('lib.ui.Viewport');
-lib.ui.Viewport = function(id) {
-  lib.ui.Component.call(this, id);
+lib.ui.Viewport = function(id, opt_parent) {
+  lib.ui.Component.call(this, id, opt_parent);
 
   this.viewportX = 0;
   this.viewportY = 0;
@@ -213,10 +319,11 @@ lib.inherits(lib.ui.Viewport, lib.ui.Component);
 
 lib.ui.Viewport.prototype.handleWheel = function(e, tx, ty, wheelX, wheelY) {
   if (!this.viewportEnabled) {
-    return;
+    return false;
   }
   this.viewportX = Math.max(0, this.viewportX - wheelX);
   this.viewportY = Math.max(0, this.viewportY - wheelY);
+  return true;
 };
 
 lib.ui.Viewport.prototype.viewportTranslateX = function(x) {
@@ -230,12 +337,7 @@ lib.ui.Viewport.prototype.viewportTranslateY = function(y) {
 
 namespace('lib.ui.Maestro');
 lib.ui.Maestro = function() {
-  this.components = [];
-};
-
-lib.ui.Maestro.prototype.addComponent = function(component) {
-  this.components.push(component);
-  component.init();
+  this.root = null;
 };
 
 lib.ui.Maestro.prototype.clear = function() {
@@ -245,108 +347,38 @@ lib.ui.Maestro.prototype.clear = function() {
   lib.ui.ctx.restore();
 };
 
+lib.ui.Maestro.prototype.init = function() {
+  lib.assert.exists(this.root);
+  this.root.init();
+};
+
 lib.ui.Maestro.prototype.resize = function() {
-  for (var i = 0, component; component = this.components[i++];) {
-    component.computeRect();
-  }
+  lib.assert.exists(this.root);
+  this.root.computeRect();
 };
 
 lib.ui.Maestro.prototype.render = function() {
+  lib.assert.exists(this.root);
+
   this.clear();
-
-  for (var i = 0, component; component = this.components[i++];) {
-    lib.ui.ctx.beginPath();
-    lib.ui.ctx.rect(
-        component.rect.left, component.rect.top, component.rect.width, component.rect.height);
-    lib.ui.ctx.clip();
-
-    lib.ui.ctx.save();
-    lib.ui.ctx.translate(component.rect.left + 0.5, component.rect.top + 0.5);
-    component.render();
-    lib.ui.ctx.restore();
-  }
+  this.root.renderInternal();
 };
 
 lib.ui.Maestro.prototype.addEventListener = function(eventType, handler) {
-  window.addEventListener(eventType, handler.bind(this));
+  window.addEventListener(eventType, handler.bind(this.root));
 };
 
 lib.ui.Maestro.prototype.addEventListeners = function() {
-  this.addEventListener('mousedown', this.handleMouseDown);
-  this.addEventListener('mousemove', this.handleMouseMove);
-  this.addEventListener('mouseup', this.handleMouseUp);
-  this.addEventListener('click', this.handleClick);
+  lib.assert.exists(this.root);
+  this.addEventListener('mousedown', this.root.handleMouseDownInternal);
+  this.addEventListener('mousemove', this.root.handleMouseMoveInternal);
+  this.addEventListener('mouseup', this.root.handleMouseUpInternal);
+  this.addEventListener('click', this.root.handleClickInternal);
 
-  this.addEventListener('mousewheel', this.handleWheel);
-  this.addEventListener('wheel', this.handleWheel);
+  this.addEventListener('mousewheel', this.root.handleWheelInternal);
+  this.addEventListener('wheel', this.root.handleWheelInternal);
 
-  this.addEventListener('keydown', this.handleKeyDown);
-};
-
-lib.ui.Maestro.prototype.tX = function(component, x) {
-  return x - component.rect.left;
-};
-
-lib.ui.Maestro.prototype.tY = function(component, y) {
-  return y - component.rect.top;
-};
-
-lib.ui.Maestro.prototype.willHandleMouse = function(e, component, handler, param1, param2) {
-  return component.isCoordinateWithin(e.clientX, e.clientY) &&
-    handler.call(component, e,
-        this.tX(component, e.clientX), this.tY(component, e.clientY),
-        param1, param2);
-};
-
-lib.ui.Maestro.prototype.handleMouseDown = function(e) {
-  for (var i = 0, component; component = this.components[i++];) {
-    if (this.willHandleMouse(e, component, component.handleMouseDown)) {
-      return;
-    }
-  }
-};
-
-lib.ui.Maestro.prototype.handleMouseMove = function(e) {
-  for (var i = 0, component; component = this.components[i++];) {
-    if (this.willHandleMouse(e, component, component.handleMouseMove)) {
-      return;
-    }
-  }
-};
-
-lib.ui.Maestro.prototype.handleMouseUp = function(e) {
-  for (var i = 0, component; component = this.components[i++];) {
-    if (this.willHandleMouse(e, component, component.handleMouseUp)) {
-      return;
-    }
-  }
-};
-
-lib.ui.Maestro.prototype.handleClick = function(e) {
-  for (var i = 0, component; component = this.components[i++];) {
-    if (this.willHandleMouse(e, component, component.handleClick)) {
-      return;
-    }
-  }
-};
-
-lib.ui.Maestro.prototype.handleWheel = function(e) {
-  var deltaX = e.deltaX || e.wheelDeltaX;
-  var deltaY = e.deltaY || e.wheelDeltaY;
-  for (var i = 0, component; component = this.components[i++];) {
-    if (this.willHandleMouse(e, component, component.handleWheel, deltaX, deltaY)) {
-      return;
-    }
-  }
-  e.preventDefault();
-};
-
-lib.ui.Maestro.prototype.handleKeyDown = function(e) {
-  for (var i = 0, component; component = this.components[i++];) {
-    if (component.handleKeyDown(e)) {
-      return;
-    }
-  }
+  this.addEventListener('keydown', this.root.handleKeyDownInternal);
 };
 
 
@@ -765,44 +797,54 @@ loop.audio.Looper.prototype.render = function() {
 
 loop.audio.Looper.prototype.handleMouseDown = function(e, tx, ty) {
   if (e.shiftKey) {
-    return;
+    return false;
   }
   this.handlingSelection = true;
   this.handlingInit = tx;
   this.handlingEnd = tx;
+
+  return true;
 };
 
 loop.audio.Looper.prototype.handleMouseMove = function(e, tx, ty) {
   if (!this.handlingSelection) {
-    return;
+    return false;
   }
   this.handlingEnd = tx;
 
   var min = Math.min(this.handlingInit, this.handlingEnd);
   var max = Math.max(this.handlingInit, this.handlingEnd);
   this.selecting(min, max);
+
+  return true;
 };
 
 loop.audio.Looper.prototype.handleMouseUp = function(e, tx, ty) {
+  if (!this.handlingSelection) {
+    return false;
+  }
   this.handlingSelection = false;
   if (this.handlingInit == this.handlingEnd) {
     this.deselect();
   } else {
     this.select();
   }
+  return true;
 };
 
 loop.audio.Looper.prototype.handleWheel = function(e, tx, ty, wheelX, wheelY) {
   if (wheelX < 0 && this.samples.length - this.viewportX < this.rect.width) {
-    return;
+    return false;
   }
-  lib.ui.Viewport.prototype.handleWheel.call(this, e, tx, ty, wheelX, wheelY);
+  return lib.ui.Viewport.prototype.handleWheel.call(this, e, tx, ty, wheelX, wheelY);
 };
 
 loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
   if (e.shiftKey) {
     this.subselect(tx);
+    return true;
   }
+  return false;
 };
 
 loop.audio.Looper.prototype.handleKeyDown = function(e) {
@@ -823,8 +865,10 @@ loop.audio.Looper.prototype.handleKeyDown = function(e) {
       this.scrollToEnd();
       break;
     default:
+      return false;
       break;
   }
+  return true;
 };
 
 
@@ -838,7 +882,7 @@ loop.audio.core.getUserMedia = (
 namespace('loop.main');
 loop.main = function() {
   lib.ui.maestro = new lib.ui.Maestro();
-  lib.ui.maestro.addComponent(new loop.audio.Looper());
+  lib.ui.maestro.root = new loop.audio.Looper();
   lib.ui.init();
 
   // Global events.
