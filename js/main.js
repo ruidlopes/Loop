@@ -681,8 +681,8 @@ loop.audio.Looper.prototype.success = function(stream) {
   this.gain.connect(loop.audio.core.context.destination);
 };
 
-loop.audio.Looper.prototype.error = function() {
-  console.log('error');
+loop.audio.Looper.prototype.error = function(e) {
+  lib.functions.error('Error on getUserMedia()', e);
 };
 
 loop.audio.Looper.prototype.download = function(opt_selection) {
@@ -693,7 +693,7 @@ loop.audio.Looper.prototype.download = function(opt_selection) {
   var sampleInit = this.useSelection && opt_selection ? this.selectionMin : 0;
   var sampleEnd = this.useSelection && opt_selection ? this.selectionMax : this.samples.length;
   this.encoder.encode(this.samples, sampleInit, sampleEnd);
-  this.encoder.asDataUrl(this.downloadReady);
+  this.encoder.asDataUrl(this.downloadReady.bind(this));
 };
 
 loop.audio.Looper.prototype.downloadReady = function(dataUrl) {
