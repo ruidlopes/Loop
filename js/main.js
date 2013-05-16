@@ -16,6 +16,11 @@ lib.inherits = function(child, base) {
   child.prototype = Object.create(base.prototype);
 };
 
+lib.isString = function(value) {
+  return typeof value === 'string';
+};
+
+
 namespace('lib.functions');
 lib.functions.error = function(value, opt_exception) {
   if (opt_exception) {
@@ -418,25 +423,35 @@ lib.ui.Viewport.prototype.viewportTranslateY = function(y) {
 
 
 namespace('lib.ui.Button');
-lib.ui.Button = function(id, text, opt_parent) {
+lib.ui.Button = function(id, label, opt_parent) {
   lib.ui.Component.call(this, id, opt_parent);
 
-  this.text = text;
+  this.label = label;
 };
 lib.inherits(lib.ui.Button, lib.ui.Component);
 
-lib.ui.Button.create = function(id, text, handler) {
-  var button = new lib.ui.Button(id, text);
+lib.ui.Button.create = function(id, label, handler) {
+  var button = new lib.ui.Button(id, label);
   button.handleClick = handler;
   return button;
 };
 
 lib.ui.Button.prototype.render = function() {
+  lib.assert.exists(this.label);
+
   if (this.hovering) {
     lib.ui.ctx.fillStyle = lib.ui.style.defs.itemStandbyLight.color;
     lib.ui.ctx.fillRect(0, 0, this.rect.width, this.rect.height);
   }
 
+  if (lib.isString(this.label)) {
+    this.renderTextLabel();
+  } else {
+    this.renderImageLabel();
+  }
+};
+
+lib.ui.Button.prototype.renderTextLabel = function() {
   lib.ui.ctx.font = lib.ui.style.defs.button.font;
   lib.ui.ctx.textAlign = 'center';
   lib.ui.ctx.textBaseline = 'middle';
@@ -444,7 +459,17 @@ lib.ui.Button.prototype.render = function() {
   lib.ui.ctx.fillStyle = this.hovering ?
     lib.ui.style.defs.itemHighlightLight.color :
     lib.ui.style.defs.itemStandby.color;
-  lib.ui.ctx.fillText(this.text, this.rect.width * 0.5, this.rect.height * 0.5);
+  lib.ui.ctx.fillText(this.label, this.rect.width * 0.5, this.rect.height * 0.5);
+};
+
+lib.ui.Button.prototype.renderImageLabel = function() {
+  var x = (this.rect.width - this.label.width) * 0.5;
+  var y = (this.rect.height - this.label.height) * 0.5;
+
+  lib.ui.ctx.save();
+  lib.ui.ctx.globalAlpha = this.hovering ? 1.0 : 0.5;
+  lib.ui.ctx.drawImage(this.label, x, y);
+  lib.ui.ctx.restore();
 };
 
 
