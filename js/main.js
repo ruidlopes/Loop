@@ -575,8 +575,9 @@ loop.audio.Sample.prototype.update = function(index, left, right) {
 
 
 namespace('loop.audio.Encoder');
-loop.audio.Encoder = function(type) {
+loop.audio.Encoder = function(type, ext) {
   this.type = type;
+  this.ext = ext;
   this.blob = null;
 };
 
@@ -606,7 +607,7 @@ loop.audio.Encoder.prototype.computeParts = lib.functions.constant([]);
 
 namespace('loop.audio.AiffEncoder');
 loop.audio.AiffEncoder = function() {
-  loop.audio.Encoder.call(this, 'audio/aiff');
+  loop.audio.Encoder.call(this, 'audio/aiff', 'aiff');
 };
 lib.inherits(loop.audio.AiffEncoder, loop.audio.Encoder);
 
@@ -684,7 +685,7 @@ loop.audio.Looper = function() {
 
   this.thread = null;
   this.samples = [];
-  this.encoder = new loop.audio.AiffEncoder();
+  this.encoder = null;
 
   this.gain = loop.audio.core.context.createGain();
   this.gain.gain.value = 5.0;
@@ -737,10 +738,15 @@ loop.audio.Looper.prototype.error = function(e) {
   lib.functions.error('Error on getUserMedia()', e);
 };
 
-loop.audio.Looper.prototype.download = function(opt_selection) {
+loop.audio.Looper.prototype.download = function(opt_mime, opt_selection) {
   if (!this.samples.length) {
     return;
   }
+
+  var encoders = {
+    'audio/aiff': loop.audio.AiffEncoder
+  };
+  this.encoder = new encoders[opt_mime || 'audio/aiff']();
 
   var sampleInit = this.useSelection && opt_selection ? this.selectionMin : 0;
   var sampleEnd = this.useSelection && opt_selection ? this.selectionMax : this.samples.length;
@@ -751,7 +757,7 @@ loop.audio.Looper.prototype.download = function(opt_selection) {
 loop.audio.Looper.prototype.downloadReady = function(dataUrl) {
   var downloadLink = document.createElement('a');
   downloadLink.href = dataUrl;
-  downloadLink.download = 'loop.aiff';
+  downloadLink.download = 'loop.' + this.encoder.ext;
 
   var e = document.createEvent('MouseEvents');
   e.initEvent('click', true, true);
