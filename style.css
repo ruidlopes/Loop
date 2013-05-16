@@ -49,7 +49,7 @@ define .looper-marker-highlight {
 }
 
 define .button {
-  font: 14pt Helvetica;
+  font: 14pt "Helvetica";
   border-color: #f00;
 }
 

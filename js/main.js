@@ -17,8 +17,14 @@ lib.inherits = function(child, base) {
 };
 
 namespace('lib.functions');
-lib.functions.error = function(value) {
-  throw Error(value);
+lib.functions.error = function(value, opt_exception) {
+  if (opt_exception) {
+    opt_exception.originalMessage = value;
+    opt_exception.message = value;
+    throw opt_exception;
+  } else {
+    throw new Error(value);
+  }
 };
 lib.functions.constant = function(value) {
   return function() {
