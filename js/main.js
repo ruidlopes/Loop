@@ -1029,7 +1029,7 @@ loop.audio.Looper.prototype.handleKeyDown = function(e) {
       this.stopAnything();
       break;
     case 36: // Home
-      lib.msg.send(loop.audio.msg.SCROLL_TO_BEGINNING);
+      this.scrollToBeginning();
       break;
     case 35: // End
       this.scrollToEnd();
