@@ -73,3 +73,24 @@ define .button {
   width: 50px;
   height: 50px;
 }
+
+#play {
+  left: 60px;
+  bottom: 10px;
+  width: 50px;
+  height: 50px;
+}
+
+#record {
+  left: 110px;
+  bottom: 10px;
+  width: 50px;
+  height: 50px;
+}
+
+#end {
+  left: 160px;
+  bottom: 10px;
+  width: 50px;
+  height: 50px;
+}

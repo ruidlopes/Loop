@@ -523,10 +523,13 @@ lib.ui.Maestro.prototype.addEventListeners = function() {
 
 
 namespace('loop.audio.msg');
-loop.audio.msg = {
-  SCROLL_TO_BEGINNING: 0x00000001
-};
-lib.msg.register(loop.audio.msg);
+lib.msg.register(loop.audio.msg = {
+  SCROLL_TO_BEGINNING: 0x00000001,
+  TOGGLE_PLAY:         0x00000002,
+  TOGGLE_RECORD:       0x00000003,
+  SCROLL_TO_END:       0x00000004
+});
+
 
 namespace('loop.audio.SampleProcessThread');
 loop.audio.SampleProcessThread = function(externalResult) {
@@ -709,6 +712,9 @@ loop.audio.Looper.prototype.init = function() {
   this.thread = new loop.audio.SampleProcessThread(this.result.bind(this));
 
   lib.msg.listen(loop.audio.msg.SCROLL_TO_BEGINNING, this.scrollToBeginning.bind(this));
+  lib.msg.listen(loop.audio.msg.TOGGLE_PLAY, this.toggleCurrentState.bind(this));
+  lib.msg.listen(loop.audio.msg.TOGGLE_RECORD, this.toggleCurrentRecordingState.bind(this));
+  lib.msg.listen(loop.audio.msg.SCROLL_TO_END, this.scrollToEnd.bind(this));
 
   loop.audio.core.getUserMedia(
       {video: false, audio: true},
@@ -843,6 +849,16 @@ loop.audio.Looper.prototype.scrollToEnd = function() {
     return;
   }
   this.viewportX = Math.max(0, this.samples.length - this.rect.width);
+};
+
+loop.audio.Looper.prototype.toggleCurrentRecordingState = function() {
+  if (this.isPlaying) {
+    this.stopPlaying();
+  } else if (this.isRecording) {
+    this.stopRecording();
+  } else {
+    this.startRecording();
+  }
 };
 
 loop.audio.Looper.prototype.toggleCurrentState = function() {
@@ -1033,6 +1049,15 @@ loop.main = function() {
   lib.ui.maestro.root = new loop.audio.Looper();
   lib.ui.maestro.root.addComponent(lib.ui.Button.create('begin', '<<', function() {
     lib.msg.send(loop.audio.msg.SCROLL_TO_BEGINNING);
+  }));
+  lib.ui.maestro.root.addComponent(lib.ui.Button.create('play', '>', function() {
+    lib.msg.send(loop.audio.msg.TOGGLE_PLAY);
+  }));
+  lib.ui.maestro.root.addComponent(lib.ui.Button.create('record', 'o', function() {
+    lib.msg.send(loop.audio.msg.TOGGLE_RECORD);
+  }));
+  lib.ui.maestro.root.addComponent(lib.ui.Button.create('end', '>>', function() {
+    lib.msg.send(loop.audio.msg.SCROLL_TO_END);
   }));
 
   lib.ui.init();
