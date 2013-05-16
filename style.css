@@ -36,8 +36,16 @@ define .item-standby {
   color: #69c;
 }
 
+define .item-standby-light {
+  color: #8be;
+}
+
 define .item-highlight {
   color: #369;
+}
+
+define .item-highlight-light {
+  color: #58b;
 }
 
 define .looper-marker-standby {
@@ -50,7 +58,6 @@ define .looper-marker-highlight {
 
 define .button {
   font: 14pt "Helvetica";
-  border-color: #f00;
 }
 
 #looper {

@@ -213,7 +213,9 @@ lib.ui.Component = function(id, opt_parent) {
   this.id = id;
   this.element = null;
   this.rect = null;
+
   this.visible = true;
+  this.hovering = false;
 
   this.parent = opt_parent || null;
   this.components = [];
@@ -285,7 +287,7 @@ lib.ui.Component.prototype.renderInternal = function() {
 
 lib.ui.Component.prototype.handleMouseDownInternal = function(e) {
   if (!this.visible) {
-    return;
+    return false;
   }
 
   for (var i = 0, child; child = this.components[i++];) {
@@ -299,21 +301,23 @@ lib.ui.Component.prototype.handleMouseDownInternal = function(e) {
 
 lib.ui.Component.prototype.handleMouseMoveInternal = function(e) {
   if (!this.visible) {
-    return;
+    return false;
   }
+
+  var within = this.isCoordinateWithin(e.clientX, e.clientY);
+  this.hovering = within;
 
   for (var i = 0, child; child = this.components[i++];) {
     if (child.handleMouseMoveInternal.bind(child)(e)) {
       return true;
     }
   }
-  return this.isCoordinateWithin(e.clientX, e.clientY) &&
-    this.handleMouseMove(e, this.tX(e.clientX), this.tY(e.clientY));
+  return within && this.handleMouseMove(e, this.tX(e.clientX), this.tY(e.clientY));
 };
 
 lib.ui.Component.prototype.handleMouseUpInternal = function(e) {
   if (!this.visible) {
-    return;
+    return false;
   }
 
   for (var i = 0, child; child = this.components[i++];) {
@@ -378,6 +382,8 @@ lib.ui.Component.prototype.render = lib.functions.EMPTY;
 lib.ui.Component.prototype.handleMouseDown = lib.functions.FALSE;
 lib.ui.Component.prototype.handleMouseMove = lib.functions.FALSE;
 lib.ui.Component.prototype.handleMouseUp = lib.functions.FALSE;
+lib.ui.Component.prototype.handleMouseOver = lib.functions.TRUE;
+lib.ui.Component.prototype.handleMouseOut = lib.functions.TRUE;
 lib.ui.Component.prototype.handleClick = lib.functions.FALSE;
 lib.ui.Component.prototype.handleWheel = lib.functions.FALSE;
 lib.ui.Component.prototype.handleKeyDown = lib.functions.FALSE;
@@ -426,10 +432,18 @@ lib.ui.Button.create = function(id, text, handler) {
 };
 
 lib.ui.Button.prototype.render = function() {
+  if (this.hovering) {
+    lib.ui.ctx.fillStyle = lib.ui.style.defs.itemStandbyLight.color;
+    lib.ui.ctx.fillRect(0, 0, this.rect.width, this.rect.height);
+  }
+
   lib.ui.ctx.font = lib.ui.style.defs.button.font;
   lib.ui.ctx.textAlign = 'center';
   lib.ui.ctx.textBaseline = 'middle';
-  lib.ui.ctx.fillStyle = lib.ui.style.defs.itemStandby.color;
+
+  lib.ui.ctx.fillStyle = this.hovering ?
+    lib.ui.style.defs.itemHighlightLight.color :
+    lib.ui.style.defs.itemStandby.color;
   lib.ui.ctx.fillText(this.text, this.rect.width * 0.5, this.rect.height * 0.5);
 };
 
@@ -473,6 +487,7 @@ lib.ui.Maestro.prototype.addEventListeners = function() {
   this.addEventListener('mousedown', this.root.handleMouseDownInternal);
   this.addEventListener('mousemove', this.root.handleMouseMoveInternal);
   this.addEventListener('mouseup', this.root.handleMouseUpInternal);
+
   this.addEventListener('click', this.root.handleClickInternal);
 
   this.addEventListener('mousewheel', this.root.handleWheelInternal);
