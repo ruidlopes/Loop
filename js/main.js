@@ -530,7 +530,8 @@ lib.msg.register(loop.audio.msg = {
   SCROLL_TO_END:       0x00000004,
   START_RECORDING:     0x00000005,
   STOP_RECORDING:      0x00000006,
-  STOP_PLAYING:        0x00000007
+  STOP_PLAYING:        0x00000007,
+  DOWNLOAD:            0x00000008
 });
 
 
@@ -722,6 +723,7 @@ loop.audio.Looper.prototype.init = function() {
   lib.msg.listen(loop.audio.msg.TOGGLE_PLAY, this.toggleCurrentState.bind(this));
   lib.msg.listen(loop.audio.msg.TOGGLE_RECORD, this.toggleCurrentRecordingState.bind(this));
   lib.msg.listen(loop.audio.msg.SCROLL_TO_END, this.scrollToEnd.bind(this));
+  lib.msg.listen(loop.audio.msg.DOWNLOAD, this.downloadWithDefaultOptions.bind(this));
 
   loop.audio.core.getUserMedia(
       {video: false, audio: true},
@@ -768,6 +770,10 @@ loop.audio.Looper.prototype.downloadReady = function(dataUrl) {
   var e = document.createEvent('MouseEvents');
   e.initEvent('click', true, true);
   downloadLink.dispatchEvent(e);
+};
+
+loop.audio.Looper.prototype.downloadWithDefaultOptions = function() {
+  this.download('audio/aiff', true);
 };
 
 loop.audio.Looper.prototype.onAudioRecord = function(e) {
@@ -1025,6 +1031,9 @@ loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
 
 loop.audio.Looper.prototype.handleKeyDown = function(e) {
   switch (e.keyCode) {
+    case 68: // D
+      lib.msg.send(loop.audio.msg.DOWNLOAD);
+      break;
     case 82: // R
       lib.msg.send(loop.audio.msg.START_RECORDING);
       break;
@@ -1060,6 +1069,7 @@ namespace('loop.main');
 loop.main = function() {
   lib.ui.maestro = new lib.ui.Maestro();
   lib.ui.maestro.root = new loop.audio.Looper();
+
   lib.ui.maestro.root.addComponent(lib.ui.Button.create('begin', '<<', function() {
     lib.msg.send(loop.audio.msg.SCROLL_TO_BEGINNING);
   }));
@@ -1071,6 +1081,10 @@ loop.main = function() {
   }));
   lib.ui.maestro.root.addComponent(lib.ui.Button.create('end', '>>', function() {
     lib.msg.send(loop.audio.msg.SCROLL_TO_END);
+  }));
+
+  lib.ui.maestro.root.addComponent(lib.ui.Button.create('download', 'download', function() {
+    lib.msg.send(loop.audio.msg.DOWNLOAD);
   }));
 
   lib.ui.init();
