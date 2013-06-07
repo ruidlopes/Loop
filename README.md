@@ -1,6 +1,8 @@
 # Loop
 A WebAudio Guitar Looper
 
+![Loop in action](http://f.cl.ly/items/2M0r2o1x0H35393A1D1O/Screen%20Shot%202013-06-06%20at%2010.45.44%20PM.png)
+
 # How-to
 ## Set up
 
