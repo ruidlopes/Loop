@@ -527,7 +527,10 @@ lib.msg.register(loop.audio.msg = {
   SCROLL_TO_BEGINNING: 0x00000001,
   TOGGLE_PLAY:         0x00000002,
   TOGGLE_RECORD:       0x00000003,
-  SCROLL_TO_END:       0x00000004
+  SCROLL_TO_END:       0x00000004,
+  START_RECORDING:     0x00000005,
+  STOP_RECORDING:      0x00000006,
+  STOP_PLAYING:        0x00000007
 });
 
 
@@ -712,6 +715,9 @@ lib.inherits(loop.audio.Looper, lib.ui.Viewport);
 loop.audio.Looper.prototype.init = function() {
   this.thread = new loop.audio.SampleProcessThread(this.result.bind(this));
 
+  lib.msg.listen(loop.audio.msg.START_RECORDING, this.startRecording.bind(this));
+  lib.msg.listen(loop.audio.msg.STOP_RECORDING, this.stopRecording.bind(this));
+  lib.msg.listen(loop.audio.msg.STOP_PLAYING, this.stopPlaying.bind(this));
   lib.msg.listen(loop.audio.msg.SCROLL_TO_BEGINNING, this.scrollToBeginning.bind(this));
   lib.msg.listen(loop.audio.msg.TOGGLE_PLAY, this.toggleCurrentState.bind(this));
   lib.msg.listen(loop.audio.msg.TOGGLE_RECORD, this.toggleCurrentRecordingState.bind(this));
@@ -1020,19 +1026,20 @@ loop.audio.Looper.prototype.handleClick = function(e, tx, ty) {
 loop.audio.Looper.prototype.handleKeyDown = function(e) {
   switch (e.keyCode) {
     case 82: // R
-      this.startRecording();
+      lib.msg.send(loop.audio.msg.START_RECORDING);
       break;
     case 32: // Space
-      this.toggleCurrentState();
+      lib.msg.send(loop.audio.msg.TOGGLE_PLAY);
       break;
     case 27: // Esc
-      this.stopAnything();
+      lib.msg.send(loop.audio.msg.STOP_RECORDING);
+      lib.msg.send(loop.audio.msg.STOP_PLAYING);
       break;
     case 36: // Home
-      this.scrollToBeginning();
+      lib.msg.send(loop.audio.msg.SCROLL_TO_BEGINNING);
       break;
     case 35: // End
-      this.scrollToEnd();
+      lib.msg.send(loop.audio.msg.SCROLL_TO_END);
       break;
     default:
       return false;
