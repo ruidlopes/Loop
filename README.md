@@ -25,7 +25,7 @@ A WebAudio Guitar Looper
 1. Buttons on the bottom left: control record/playback & position;
 2. Download button: download recorded audio.
 
-### Displayed audio wave
+#### Displayed audio wave
 3. Select subsection to create loop;
 4. Shift-click to expand/collapse existing loop;
 5. Click to remove existing loop.
